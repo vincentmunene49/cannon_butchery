@@ -1,0 +1,210 @@
+# Cannon Butchery Tracker — Setup Guide
+
+Follow these steps in order. The app will not compile until steps 1–4 are complete.
+
+---
+
+## Prerequisites
+
+- Flutter SDK installed and on your PATH
+- Android Studio (for Android) or Xcode (for iOS)
+- A Google account for Firebase
+
+---
+
+## Step 1 — Create a Firebase Project
+
+1. Go to [https://console.firebase.google.com](https://console.firebase.google.com)
+2. Click **Add project**
+3. Name it e.g. `cannon-butchery-tracker`
+4. Disable Google Analytics (optional)
+5. Click **Create project**
+
+---
+
+## Step 2 — Add Android App to Firebase
+
+1. In your Firebase project, click **Add app** → Android icon
+2. **Android package name:** `com.cannon.butchery.tracker`
+3. **App nickname:** `Cannon Butchery Android` (optional)
+4. Click **Register app**
+5. Download the `google-services.json` file
+6. **Place it at:** `android/app/google-services.json`
+7. Click **Next** through the remaining setup steps (the Gradle changes are already done)
+
+---
+
+## Step 3 — Add iOS App to Firebase
+
+1. In your Firebase project, click **Add app** → iOS icon
+2. **iOS bundle ID:** `com.cannon.butchery.tracker`
+3. **App nickname:** `Cannon Butchery iOS` (optional)
+4. Click **Register app**
+5. Download the `GoogleService-Info.plist` file
+6. **Place it at:** `ios/Runner/GoogleService-Info.plist`
+7. Click **Next** through the remaining setup steps
+
+---
+
+## Step 4 — Configure iOS Google Sign-In URL Scheme
+
+1. Open `GoogleService-Info.plist` in a text editor
+2. Find the value for `REVERSED_CLIENT_ID` — it looks like:
+   `com.googleusercontent.apps.123456789-xxxxxxxxxxxxxxxxxxxx`
+3. Open `ios/Runner/Info.plist` in a text editor
+4. Find this section:
+   ```xml
+   <string>YOUR_REVERSED_CLIENT_ID</string>
+   ```
+5. Replace `YOUR_REVERSED_CLIENT_ID` with your actual value, e.g.:
+   ```xml
+   <string>com.googleusercontent.apps.123456789-xxxxxxxxxxxxxxxxxxxx</string>
+   ```
+
+---
+
+## Step 5 — Generate firebase_options.dart
+
+Install the FlutterFire CLI and generate the Dart Firebase config:
+
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure --project=YOUR_FIREBASE_PROJECT_ID
+```
+
+Replace `YOUR_FIREBASE_PROJECT_ID` with your actual Firebase project ID (visible in Firebase Console → Project Settings → General).
+
+When prompted, select **android** and **ios** platforms. This will **overwrite** `lib/firebase_options.dart` with real values.
+
+---
+
+## Step 6 — Enable Google Sign-In in Firebase Auth
+
+1. In Firebase Console → **Authentication** → **Sign-in method**
+2. Click **Google** → toggle **Enable**
+3. Set **Project support email** (required)
+4. Click **Save**
+
+---
+
+## Step 7 — Set Up Firestore Database
+
+1. In Firebase Console → **Firestore Database**
+2. Click **Create database**
+3. Choose **Start in production mode** (we'll add rules next)
+4. Select a region close to you (e.g. `europe-west1` or `us-central1`)
+5. Click **Done**
+
+### Apply Security Rules
+
+In Firebase Console → **Firestore Database** → **Rules**, paste:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+Click **Publish**.
+
+---
+
+## Step 8 — Add SHA-1 Fingerprint for Android Google Sign-In
+
+Google Sign-In on Android requires your SHA-1 fingerprint registered in Firebase.
+
+### Get debug SHA-1:
+```bash
+keytool -list -v \
+  -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey \
+  -storepass android \
+  -keypass android
+```
+
+Copy the **SHA1** value (looks like `AA:BB:CC:DD:...`).
+
+### Add it to Firebase:
+1. Firebase Console → **Project Settings** → **General**
+2. Scroll to **Your apps** → select your Android app
+3. Click **Add fingerprint**
+4. Paste the SHA-1 and click **Save**
+
+---
+
+## Step 9 — Install Dependencies
+
+```bash
+cd ~/cannonbutchery_tracker
+flutter pub get
+```
+
+---
+
+## Step 10 — Run the App
+
+### Android:
+```bash
+flutter run
+# or target a specific device:
+flutter run -d <device-id>
+```
+
+### iOS (requires Xcode on macOS):
+```bash
+flutter run -d ios
+```
+
+---
+
+## First Launch
+
+1. The app opens to the **Sign In** screen
+2. Tap **Sign in with Google** and authenticate with your Google account
+3. Go to **Settings** → **Opening Balances** and enter your starting M-Pesa and cash amounts
+4. Go to **Settings** → **Products** and add all your butchery products
+5. Go to **Stock** → **Add Stock** to record any stock purchased today
+6. At the end of the day, tap **Nightly Entry** to record remaining stock and closing balances
+
+---
+
+## File Placement Summary
+
+```
+cannonbutchery_tracker/
+├── android/
+│   └── app/
+│       └── google-services.json          ← Download from Firebase
+├── ios/
+│   └── Runner/
+│       └── GoogleService-Info.plist      ← Download from Firebase
+└── lib/
+    └── firebase_options.dart             ← Generated by: flutterfire configure
+```
+
+---
+
+## Troubleshooting
+
+**"PigeonUserDetails" or Google Sign-In crash on iOS**
+- Verify `REVERSED_CLIENT_ID` is correctly set in `ios/Runner/Info.plist`
+- Ensure `GoogleService-Info.plist` is added to the Xcode Runner target (open `ios/Runner.xcworkspace` in Xcode → drag the plist into the Runner folder → ensure "Add to targets: Runner" is checked)
+
+**"google-services.json not found" build error**
+- Verify the file is at `android/app/google-services.json` (not `android/google-services.json`)
+
+**Sign-in fails with "DEVELOPER_ERROR" on Android**
+- Verify the SHA-1 fingerprint is added to Firebase (Step 8)
+- For release builds, add the release keystore SHA-1 as well
+
+**Firestore permission denied**
+- Verify you are signed in (the Firestore rules require `request.auth != null`)
+- Verify the rules were published (Step 7)
+
+**App not compiling — firebase_options.dart**
+- Run `flutterfire configure` (Step 5) to generate the real config file

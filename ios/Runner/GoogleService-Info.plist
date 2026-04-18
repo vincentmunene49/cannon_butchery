@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>30985386132-693f6u240u051ea8h22vff142ac64pvs.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.30985386132-693f6u240u051ea8h22vff142ac64pvs</string>
+	<key>API_KEY</key>
+	<string>AIzaSyA1Bz3eh-npOIJxC4A1f2YwHKCdFjPmJps</string>
+	<key>GCM_SENDER_ID</key>
+	<string>30985386132</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.cannon.butchery.tracker</string>
+	<key>PROJECT_ID</key>
+	<string>cannonbutchery</string>
+	<key>STORAGE_BUCKET</key>
+	<string>cannonbutchery.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:30985386132:ios:d177098ea8cf83008d9c81</string>
+</dict>
+</plist>

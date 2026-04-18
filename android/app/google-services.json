@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "30985386132",
+    "project_id": "cannonbutchery",
+    "storage_bucket": "cannonbutchery.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:30985386132:android:1eaf795f7af432018d9c81",
+        "android_client_info": {
+          "package_name": "com.cannon.butchery.tracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "30985386132-a33kna2eit5pskog9g090rbafs7kg5jm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfKzbadS6aTYgs3oz9w7bIDr1B4ht5Oas"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "30985386132-a33kna2eit5pskog9g090rbafs7kg5jm.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "30985386132-693f6u240u051ea8h22vff142ac64pvs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.cannon.butchery.tracker"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
