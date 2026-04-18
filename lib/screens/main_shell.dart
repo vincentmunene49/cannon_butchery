@@ -1,4 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../app_theme.dart';
+import '../utils/error_handler.dart';
 import 'home/home_screen.dart';
 import 'nightly_entry/nightly_entry_screen.dart';
 import 'stock/stock_screen.dart';
@@ -6,22 +9,41 @@ import 'reports/reports_screen.dart';
 import 'settings/settings_screen.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  final VoidCallback onEmployeeAccess;
+
+  const MainShell({super.key, required this.onEmployeeAccess});
 
   @override
   State<MainShell> createState() => MainShellState();
 }
 
 class MainShellState extends State<MainShell> {
-  int _selectedIndex = 0;
+  static const String _authorizedEmail = 'munenevincent49@gmail.com';
 
-  static final _pages = <Widget>[
-    const HomeScreen(),
-    const NightlyEntryScreen(),
-    const StockScreen(),
-    const ReportsScreen(),
-    const SettingsScreen(),
-  ];
+  int _selectedIndex = 0;
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthorization();
+    _pages = [
+      const HomeScreen(),
+      const NightlyEntryScreen(),
+      const StockScreen(),
+      const ReportsScreen(),
+      SettingsScreen(onEmployeeAccess: widget.onEmployeeAccess),
+    ];
+  }
+
+  void _checkAuthorization() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.email != _authorizedEmail) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showPermissionDeniedDialog(context);
+      });
+    }
+  }
 
   void navigateTo(int index) {
     setState(() => _selectedIndex = index);
@@ -29,6 +51,15 @@ class MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    // Don't render pages if unauthorized - just show loading while dialog appears
+    if (user == null || user.email != _authorizedEmail) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: kPrimary)),
+      );
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,

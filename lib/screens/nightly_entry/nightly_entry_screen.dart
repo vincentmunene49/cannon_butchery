@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app_theme.dart';
@@ -6,6 +7,7 @@ import '../../models/product.dart';
 import '../../models/product_entry.dart';
 import '../../models/stock_addition.dart';
 import '../../services/firestore_service.dart';
+import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';

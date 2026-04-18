@@ -1,10 +1,13 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../app_theme.dart';
 import '../../models/daily_entry.dart';
 import '../../models/product_entry.dart';
+import '../../models/sale.dart';
 import '../../models/stock_addition.dart';
 import '../../services/firestore_service.dart';
+import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
@@ -19,7 +22,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
-  late final _tabController = TabController(length: 5, vsync: this);
+  late final _tabController = TabController(length: 6, vsync: this);
 
   @override
   void dispose() {
@@ -44,6 +47,7 @@ class _ReportsScreenState extends State<ReportsScreen>
             Tab(text: 'Profit & Margins'),
             Tab(text: 'Accountability'),
             Tab(text: 'Trends'),
+            Tab(text: 'Sales Log'),
           ],
         ),
       ),
@@ -55,6 +59,7 @@ class _ReportsScreenState extends State<ReportsScreen>
           _ProfitTab(),
           _AccountabilityTab(),
           _TrendsTab(),
+          _SalesTab(),
         ],
       ),
     );
@@ -1758,4 +1763,259 @@ class _TrendsTabState extends State<_TrendsTab> {
           ),
         ),
       );
+}
+
+// ─── Sales Log Tab (admin only) ───────────────────────────────────────────────
+
+class _SalesTab extends StatefulWidget {
+  const _SalesTab();
+
+  @override
+  State<_SalesTab> createState() => _SalesTabState();
+}
+
+class _SalesTabState extends State<_SalesTab> {
+  int _range = 0; // 0=today, 1=week, 2=month
+  bool _loading = true;
+  List<DailyEntry> _entries = [];
+  List<Sale> _sales = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final entries = await FirestoreService.getAllEntries();
+    final sales = await FirestoreService.getAllSales();
+    if (!mounted) return;
+    setState(() {
+      _entries = entries;
+      _sales = sales;
+      _loading = false;
+    });
+  }
+
+  (DateTime from, DateTime to) get _dateRange {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return switch (_range) {
+      1 => (now.subtract(const Duration(days: 7)), now),
+      2 => (now.subtract(const Duration(days: 30)), now),
+      _ => (todayStart, todayStart.add(const Duration(days: 1))),
+    };
+  }
+
+  List<DailyEntry> get _filteredEntries {
+    final (from, to) = _dateRange;
+    return _entries.where((e) =>
+        !e.date.isBefore(from) && e.date.isBefore(to)).toList();
+  }
+
+  List<Sale> get _filteredSales {
+    final (from, to) = _dateRange;
+    return _sales.where((s) =>
+        !s.date.isBefore(from) && s.date.isBefore(to)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const LoadingWidget();
+
+    final entries = _filteredEntries;
+    final sales = _filteredSales;
+
+    final totalReceived =
+        entries.fold<double>(0, (s, e) => s + e.totalReceived);
+    final totalExpected =
+        entries.fold<double>(0, (s, e) => s + e.totalExpectedMinimum);
+    final totalVariance =
+        entries.fold<double>(0, (s, e) => s + e.variance);
+
+    final totalLogged = sales.fold<double>(0, (s, sale) => s + sale.total);
+    final salesCount = sales.length;
+
+    final byProduct = <String, double>{};
+    final mpesaByProduct = <String, double>{};
+    final cashByProduct = <String, double>{};
+    for (final sale in sales) {
+      byProduct[sale.productName] =
+          (byProduct[sale.productName] ?? 0) + sale.total;
+      if (sale.paymentMethod == 'mpesa') {
+        mpesaByProduct[sale.productName] =
+            (mpesaByProduct[sale.productName] ?? 0) + sale.total;
+      } else {
+        cashByProduct[sale.productName] =
+            (cashByProduct[sale.productName] ?? 0) + sale.total;
+      }
+    }
+
+    final mpesaLogged = sales
+        .where((s) => s.paymentMethod == 'mpesa')
+        .fold<double>(0, (s, sale) => s + sale.total);
+    final cashLogged = sales
+        .where((s) => s.paymentMethod == 'cash')
+        .fold<double>(0, (s, sale) => s + sale.total);
+
+    final receivedVsLogged = totalReceived - totalLogged;
+    final expectedVsLogged = totalExpected - totalLogged;
+
+    return RefreshIndicator(
+      color: kPrimary,
+      onRefresh: _load,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(value: 0, label: Text('Today')),
+                ButtonSegment(value: 1, label: Text('This Week')),
+                ButtonSegment(value: 2, label: Text('This Month')),
+              ],
+              selected: {_range},
+              onSelectionChanged: (s) => setState(() => _range = s.first),
+              style: SegmentedButton.styleFrom(
+                selectedBackgroundColor: kPrimary.withValues(alpha: 0.1),
+                selectedForegroundColor: kPrimary,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Section 1 — Stock System
+            _sectionHeader(context, 'Stock System'),
+            AppCard(
+              child: Column(
+                children: [
+                  _kv(context, 'Expected minimum', formatCurrency(totalExpected)),
+                  _kv(context, 'Total received', formatCurrency(totalReceived)),
+                  const Divider(),
+                  _kv(context, 'Variance', formatVariance(totalVariance),
+                      valueColor: totalVariance >= 0 ? kGreen : kRed, bold: true),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Section 2 — Employee Sales Log
+            _sectionHeader(context, 'Employee Sales Log'),
+            AppCard(
+              child: sales.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text('No employee sales logged for this period.',
+                          style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    )
+                  : Column(
+                      children: [
+                        _kv(context, 'Total logged', formatCurrency(totalLogged),
+                            bold: true),
+                        _kv(context, 'Transactions', '$salesCount sale${salesCount == 1 ? '' : 's'}'),
+                        if (byProduct.isNotEmpty) ...[
+                          const Divider(),
+                          ...byProduct.entries.map((e) => Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _kv(context, e.key, formatCurrency(e.value)),
+                                  _subKv(context, 'M-Pesa',
+                                      formatCurrency(mpesaByProduct[e.key] ?? 0)),
+                                  _subKv(context, 'Cash',
+                                      formatCurrency(cashByProduct[e.key] ?? 0)),
+                                ],
+                              )),
+                        ],
+                        const Divider(),
+                        _kv(context, 'M-Pesa', formatCurrency(mpesaLogged)),
+                        _kv(context, 'Cash', formatCurrency(cashLogged)),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 16),
+
+            // Section 3 — Reconciliation
+            _sectionHeader(context, 'Reconciliation'),
+            AppCard(
+              child: Column(
+                children: [
+                  _kv(context, 'Received vs logged',
+                      formatVariance(receivedVsLogged),
+                      valueColor: receivedVsLogged >= 0
+                          ? Colors.black87
+                          : kRed,
+                      bold: true),
+                  _kv(context, 'Expected vs logged',
+                      formatVariance(expectedVsLogged)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            AppCard(
+              color: const Color(0xFFFFF8E1),
+              child: Text(
+                'Positive gaps in received vs logged are normal on busy days '
+                'when not every sale is entered. A negative gap means more was '
+                'logged than actually received — investigate.',
+                style: TextStyle(fontSize: 11, color: Colors.brown[700]),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(BuildContext context, String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(title,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+      );
+
+  Widget _kv(BuildContext context, String k, String v,
+      {Color? valueColor, bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(k,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[600],
+                    fontWeight: bold ? FontWeight.w700 : null,
+                  )),
+          Text(v,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+                    color: valueColor,
+                  )),
+        ],
+      ),
+    );
+  }
+
+  Widget _subKv(BuildContext context, String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 1, bottom: 1),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('└ $k',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[400],
+                    fontSize: 11,
+                  )),
+          Text(v,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[500],
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  )),
+        ],
+      ),
+    );
+  }
 }

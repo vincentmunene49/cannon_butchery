@@ -3,7 +3,9 @@ import '../../app_theme.dart';
 import '../../services/auth_service.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  final VoidCallback onEmployeeAccess;
+
+  const SignInScreen({super.key, required this.onEmployeeAccess});
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -88,35 +90,62 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
               ),
               const Spacer(flex: 3),
-              // Google sign in button
-              _loading
-                  ? const CircularProgressIndicator(color: kPrimary)
-                  : SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _signIn,
-                        icon: Image.network(
-                          'https://www.google.com/favicon.ico',
-                          width: 20,
-                          height: 20,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.login, size: 20),
-                        ),
-                        label: const Text('Sign in with Google'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(kCardRadius),
-                          ),
-                          side: const BorderSide(color: Color(0xFFE0E0E0)),
-                          foregroundColor: Colors.black87,
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
+
+              // Owner sign-in
+              if (_loading)
+                const CircularProgressIndicator(color: kPrimary)
+              else ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _signIn,
+                    icon: Image.network(
+                      'https://www.google.com/favicon.ico',
+                      width: 20,
+                      height: 20,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.login, size: 20),
+                    ),
+                    label: const Text('Sign in with Google'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(kCardRadius),
+                      ),
+                      side: const BorderSide(color: Color(0xFFE0E0E0)),
+                      foregroundColor: Colors.black87,
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
                       ),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Employee access
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: widget.onEmployeeAccess,
+                    icon: const Icon(Icons.badge_outlined, size: 20),
+                    label: const Text('Employee Access'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(kCardRadius),
+                      ),
+                      side: BorderSide(color: Colors.grey[300]!),
+                      foregroundColor: Colors.grey[700],
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 24),
               Text(
                 'Sign in once — your data syncs across all your devices.',

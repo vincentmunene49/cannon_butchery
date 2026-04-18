@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product.dart';
 import '../models/daily_entry.dart';
 import '../models/product_entry.dart';
+import '../models/sale.dart';
 import '../models/stock_addition.dart';
 import '../utils/formatters.dart';
 
@@ -12,6 +13,7 @@ class FirestoreService {
   static CollectionReference get _products => _db.collection('products');
   static CollectionReference get _dailyEntries => _db.collection('dailyEntries');
   static CollectionReference get _stockAdditions => _db.collection('stockAdditions');
+  static CollectionReference get _sales => _db.collection('sales');
 
   // ─── Products ──────────────────────────────────────────────────────────────
 
@@ -351,6 +353,68 @@ class FirestoreService {
       'mpesa': (data['mpesa'] ?? 0).toDouble(),
       'cash': (data['cash'] ?? 0).toDouble(),
     };
+  }
+
+  // ─── Sales (employee log — isolated from all accounting calculations) ─────
+
+  static Future<void> addSale(Sale sale) async {
+    await _sales.doc(sale.id).set(sale.toFirestore());
+  }
+
+  static Stream<List<Sale>> salesStreamForDate(String dateId) {
+    final startOfDay = idToDate(dateId);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    return _sales
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => Sale.fromFirestore(d)).toList());
+  }
+
+  static Stream<List<Sale>> allSalesStream() {
+    return _sales
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => Sale.fromFirestore(d)).toList());
+  }
+
+  static Future<List<Sale>> getAllSales() async {
+    final snap = await _sales.orderBy('date', descending: true).get();
+    return snap.docs.map((d) => Sale.fromFirestore(d)).toList();
+  }
+
+  static Future<List<Sale>> getSalesForRange(
+      DateTime from, DateTime to) async {
+    final snap = await _sales
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
+        .where('date', isLessThan: Timestamp.fromDate(to))
+        .orderBy('date', descending: true)
+        .get();
+    return snap.docs.map((d) => Sale.fromFirestore(d)).toList();
+  }
+
+  // ─── Employee PIN ──────────────────────────────────────────────────────────
+
+  static Future<String?> getEmployeePin() async {
+    final snap =
+        await _db.collection('config').doc('app_config').get();
+    if (!snap.exists) return null;
+    final data = snap.data() as Map<String, dynamic>;
+    return data['employeePin'] as String?;
+  }
+
+  static Future<void> setEmployeePin(String pin) async {
+    await _db.collection('config').doc('app_config').set(
+      {'employeePin': pin},
+      SetOptions(merge: true),
+    );
+  }
+
+  static Future<void> clearEmployeePin() async {
+    await _db.collection('config').doc('app_config').update(
+      {'employeePin': FieldValue.delete()},
+    );
   }
 
   // ─── New Product Opening Stock ────────────────────────────────────────────
