@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -5,6 +6,7 @@ import '../../app_theme.dart';
 import '../../models/product.dart';
 import '../../models/stock_addition.dart';
 import '../../services/firestore_service.dart';
+import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
@@ -47,6 +49,7 @@ class _StockScreenState extends State<StockScreen> {
 
   Future<void> _loadProducts() async {
     final products = await FirestoreService.getProducts();
+    if (!mounted) return;
     setState(() {
       _products = products.where((p) => p.isActive).toList();
       _productsLoading = false;

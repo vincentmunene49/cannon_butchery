@@ -7,13 +7,16 @@ import '../../models/product.dart';
 import '../../services/auth_service.dart';
 import '../../services/export_service.dart';
 import '../../services/firestore_service.dart';
+import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/status_chip.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  final VoidCallback onEmployeeAccess;
+
+  const SettingsScreen({super.key, required this.onEmployeeAccess});
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +29,8 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
           const _Day1OpeningStockSection(),
           const _OpeningBalancesSection(),
+          const SizedBox(height: 24),
+          _EmployeeAccessSection(onEnterEmployeeMode: onEmployeeAccess),
           const SizedBox(height: 24),
           const _DataManagementSection(),
           const SizedBox(height: 24),
@@ -767,6 +772,251 @@ class _OpeningBalancesSectionState extends State<_OpeningBalancesSection> {
                     ),
                   ],
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Employee Access Section ───────────────────────────────────────────────────
+
+class _EmployeeAccessSection extends StatefulWidget {
+  final VoidCallback onEnterEmployeeMode;
+  const _EmployeeAccessSection({required this.onEnterEmployeeMode});
+
+  @override
+  State<_EmployeeAccessSection> createState() => _EmployeeAccessSectionState();
+}
+
+class _EmployeeAccessSectionState extends State<_EmployeeAccessSection> {
+  String? _pin;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPin();
+  }
+
+  Future<void> _loadPin() async {
+    final pin = await FirestoreService.getEmployeePin();
+    if (mounted) setState(() { _pin = pin; _loading = false; });
+  }
+
+  String get _maskedPin => _pin?.replaceAll(RegExp(r'.'), '●') ?? '';
+
+  Future<void> _showPinDialog({bool isChange = false}) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _PinInputDialog(isChange: isChange),
+    );
+    if (result == null) return;
+    setState(() => _saving = true);
+    try {
+      await FirestoreService.setEmployeePin(result);
+      setState(() { _pin = result; _saving = false; });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isChange ? 'PIN updated.' : 'Employee PIN set.')),
+        );
+      }
+    } catch (e) {
+      setState(() => _saving = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _disableAccess() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disable Employee Access?'),
+        content: const Text(
+            'The Employee Access button will be hidden and the PIN will be cleared.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: kRed),
+            child: const Text('Disable'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _saving = true);
+    try {
+      await FirestoreService.clearEmployeePin();
+      setState(() { _pin = null; _saving = false; });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Employee access disabled.')),
+        );
+      }
+    } catch (e) {
+      setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(title: 'Employee Access'),
+        AppCard(
+          child: _saving
+              ? const Center(
+                  child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(color: kPrimary),
+                ))
+              : _pin == null
+                  ? _buildNotSetUp()
+                  : _buildSetUp(),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildNotSetUp() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Text(
+            'Employee access is not configured. Set a 4-digit PIN to allow employees to log sales.',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _showPinDialog(),
+            icon: const Icon(Icons.lock_open_outlined, size: 18),
+            label: const Text('Set Up Employee PIN'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSetUp() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.lock_outline, color: kPrimary),
+          title: const Text('Current PIN',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text(_maskedPin,
+              style: const TextStyle(fontSize: 20, letterSpacing: 6)),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => _showPinDialog(isChange: true),
+            child: const Text('Change PIN'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: widget.onEnterEmployeeMode,
+            icon: const Icon(Icons.switch_account_outlined, size: 18),
+            label: const Text('Switch to Employee Mode'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary.withValues(alpha: 0.1),
+              foregroundColor: kPrimary,
+              elevation: 0,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(
+            onPressed: _disableAccess,
+            style: TextButton.styleFrom(foregroundColor: kRed),
+            child: const Text('Disable Employee Access'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PinInputDialog extends StatefulWidget {
+  final bool isChange;
+  const _PinInputDialog({required this.isChange});
+
+  @override
+  State<_PinInputDialog> createState() => _PinInputDialogState();
+}
+
+class _PinInputDialogState extends State<_PinInputDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.isChange ? 'Change PIN' : 'Set Employee PIN'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.isChange
+                ? 'Enter a new 4-digit PIN for employee access.'
+                : 'Enter a 4-digit PIN. Employees will use this to access the sales screen.',
+            style: const TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: '4-digit PIN',
+              counterText: '',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: _ctrl.text.length == 4
+              ? () => Navigator.pop(context, _ctrl.text)
+              : null,
+          child: const Text('Save'),
         ),
       ],
     );

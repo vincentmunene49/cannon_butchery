@@ -3,15 +3,22 @@ import 'package:flutter/material.dart';
 import '../../app_theme.dart';
 import '../../models/daily_entry.dart';
 import '../../models/product_entry.dart';
+import '../../models/sale.dart';
 import '../../services/firestore_service.dart';
+import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/status_chip.dart';
 import '../main_shell.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final todayId = dateToId(DateTime.now());
@@ -24,6 +31,10 @@ class HomeScreen extends StatelessWidget {
         child: StreamBuilder<DailyEntry?>(
           stream: FirestoreService.entryStreamForDate(todayId),
           builder: (context, snapshot) {
+            // Handle permission denied errors
+            if (snapshot.hasError) {
+              handleFirestoreError(snapshot.error, context);
+            }
             final entry = snapshot.data;
             return RefreshIndicator(
               color: kPrimary,
@@ -99,7 +110,7 @@ class HomeScreen extends StatelessWidget {
 
                           if (entry != null) ...[
                             Text(
-                              'Products Today',
+                              "Today's Product Breakdown",
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium
@@ -112,9 +123,9 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Per-product list
+                  // Per-product breakdown with employee sales reconciliation
                   if (entry != null)
-                    _ProductEntriesList(dateId: todayId),
+                    _ProductBreakdownList(dateId: todayId),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
@@ -268,76 +279,217 @@ class _CumulativeVarianceCard extends StatelessWidget {
   }
 }
 
-class _ProductEntriesList extends StatelessWidget {
+class _ProductBreakdownList extends StatefulWidget {
   final String dateId;
-  const _ProductEntriesList({required this.dateId});
+  const _ProductBreakdownList({required this.dateId});
+
+  @override
+  State<_ProductBreakdownList> createState() => _ProductBreakdownListState();
+}
+
+class _ProductBreakdownListState extends State<_ProductBreakdownList> {
+  List<ProductEntry> _productEntries = [];
+  bool _loadingEntries = true;
+
+  @override
+  void initState() {
+    super.initState();
+    FirestoreService.getProductEntriesForDate(widget.dateId).then((entries) {
+      if (mounted) setState(() { _productEntries = entries; _loadingEntries = false; });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<ProductEntry>>(
-      future: FirestoreService.getProductEntriesForDate(dateId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(child: CircularProgressIndicator(color: kPrimary)),
-            ),
-          );
+    if (_loadingEntries) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(child: CircularProgressIndicator(color: kPrimary)),
+        ),
+      );
+    }
+
+    if (_productEntries.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    return StreamBuilder<List<Sale>>(
+      stream: FirestoreService.salesStreamForDate(widget.dateId),
+      builder: (context, salesSnap) {
+        final sales = salesSnap.data ?? [];
+
+        // Aggregate logged totals + payment split per product name
+        final loggedByProduct = <String, double>{};
+        final mpesaByProduct = <String, double>{};
+        final cashByProduct = <String, double>{};
+        for (final s in sales) {
+          loggedByProduct[s.productName] =
+              (loggedByProduct[s.productName] ?? 0) + s.total;
+          if (s.paymentMethod == 'mpesa') {
+            mpesaByProduct[s.productName] =
+                (mpesaByProduct[s.productName] ?? 0) + s.total;
+          } else {
+            cashByProduct[s.productName] =
+                (cashByProduct[s.productName] ?? 0) + s.total;
+          }
         }
 
-        final entries = snapshot.data ?? [];
-        if (entries.isEmpty) {
-          return const SliverToBoxAdapter(child: SizedBox.shrink());
-        }
+        final hasSales = sales.isNotEmpty;
 
         return SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
-              final pe = entries[index];
+              // Last item: footer note
+              if (index == _productEntries.length) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                  child: Text(
+                    'Based on employee sales entries vs stock movement',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.grey[400], fontSize: 11),
+                  ),
+                );
+              }
+
+              final pe = _productEntries[index];
+              final logged = loggedByProduct[pe.productName] ?? 0;
+              final mpesa = mpesaByProduct[pe.productName] ?? 0;
+              final cash = cashByProduct[pe.productName] ?? 0;
+              final variance = logged - pe.minimumExpected;
+              final isOk = variance >= 0;
+              final productHasSales = logged > 0;
+
               return Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: AppCard(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              pe.productName,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          TypeBadge(productType: pe.productType),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _row(context, 'Stock expected min',
+                          formatCurrency(pe.minimumExpected)),
+                      if (hasSales) ...[
+                        _row(context, 'Employee logged',
+                            formatCurrency(logged)),
+                        // Payment split sub-rows — only for this product's sales
+                        if (productHasSales) ...[
+                          _subRow(context, 'M-Pesa', formatCurrency(mpesa)),
+                          _subRow(context, 'Cash', formatCurrency(cash)),
+                        ],
+                        const Divider(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            Text('Variance',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w600)),
                             Row(
                               children: [
                                 Text(
-                                  pe.productName,
+                                  formatVariance(variance),
                                   style: Theme.of(context)
                                       .textTheme
-                                      .titleSmall
-                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                      .bodySmall
+                                      ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: isOk ? kGreen : kRed),
                                 ),
                                 const SizedBox(width: 8),
-                                TypeBadge(productType: pe.productType),
+                                StatusChip(
+                                  isGood: isOk,
+                                  customLabel: isOk ? 'OK' : 'Low',
+                                ),
                               ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Sold: ${formatWeight(pe.estimatedSold, pe.productType)} · Min: ${formatCurrency(pe.minimumExpected)}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: Colors.grey[600]),
                             ),
                           ],
                         ),
-                      ),
-                      StatusChip(isGood: pe.variance >= 0),
+                      ] else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'No sales logged yet today',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                    color: Colors.grey[400],
+                                    fontStyle: FontStyle.italic),
+                          ),
+                        ),
                     ],
                   ),
                 ),
               );
             },
-            childCount: entries.length,
+            // +1 for the footer note row
+            childCount: _productEntries.length + 1,
           ),
         );
       },
+    );
+  }
+
+  Widget _row(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey[600])),
+          Text(value,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _subRow(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('└ $label',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[400],
+                    fontSize: 11,
+                  )),
+          Text(value,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[500],
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  )),
+        ],
+      ),
     );
   }
 }
