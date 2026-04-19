@@ -9,3 +9,7 @@ void downloadFile(String content, String filename) {
     ..click();
   html.Url.revokeObjectUrl(url);
 }
+
+Future<void> shareFiles(String productsCsv, String entriesCsv, String stockCsv) async {
+  throw UnsupportedError('shareFiles should not be called on web, use downloadFile instead');
+}
