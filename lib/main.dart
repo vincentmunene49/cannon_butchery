@@ -8,10 +8,21 @@ import 'screens/auth/sign_in_screen.dart';
 import 'screens/employee/employee_pin_screen.dart';
 import 'screens/employee/employee_sales_screen.dart';
 import 'screens/main_shell.dart';
+import 'widgets/web_layout_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Firebase only if not already initialized
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  } catch (e) {
+    if (e is FirebaseException && e.code == 'duplicate-app') {
+      // Firebase already initialized, continue
+    } else {
+      rethrow;
+    }
+  }
 
   // TEMPORARY: Force sign out on launch (REMOVE AFTER TESTING)
    //await FirebaseAuth.instance.signOut();
@@ -71,28 +82,38 @@ class _AuthGateState extends State<_AuthGate> {
   Widget build(BuildContext context) {
     // Employee modes take priority — render independently of auth state
     if (_mode == _AppMode.employeePin) {
-      return EmployeePinScreen(
-        onSuccess: _enterEmployee,
-        onBack: _exitEmployee,
+      return WebLayoutWrapper(
+        child: EmployeePinScreen(
+          onSuccess: _enterEmployee,
+          onBack: _exitEmployee,
+        ),
       );
     }
 
     if (_mode == _AppMode.employee) {
-      return EmployeeSalesScreen(onLock: _enterEmployeePin);
+      return WebLayoutWrapper(
+        child: EmployeeSalesScreen(onLock: _enterEmployeePin),
+      );
     }
 
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: kPrimary)),
+          return WebLayoutWrapper(
+            child: Scaffold(
+              body: Center(child: CircularProgressIndicator(color: kPrimary)),
+            ),
           );
         }
         if (snapshot.hasData) {
-          return MainShell(onEmployeeAccess: _enterEmployeePin);
+          return WebLayoutWrapper(
+            child: MainShell(onEmployeeAccess: _enterEmployeePin),
+          );
         }
-        return SignInScreen(onEmployeeAccess: _enterEmployeePin);
+        return WebLayoutWrapper(
+          child: SignInScreen(onEmployeeAccess: _enterEmployeePin),
+        );
       },
     );
   }

@@ -14,7 +14,7 @@ import 'package:flutter/foundation.dart'
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (kIsWeb) throw UnsupportedError('Web not supported.');
+      return web;
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -44,9 +44,21 @@ class DefaultFirebaseOptions {
     messagingSenderId: '30985386132',
     projectId: 'cannonbutchery',
     storageBucket: 'cannonbutchery.firebasestorage.app',
+    androidClientId: '30985386132-hhr7qj9rbgpn51je39mkosk43kv2qmjt.apps.googleusercontent.com',
     iosClientId: '30985386132-693f6u240u051ea8h22vff142ac64pvs.apps.googleusercontent.com',
     iosBundleId: 'com.cannon.butchery.tracker',
   );
 
   // TODO: Replace with real values from `flutterfire configure`
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyCvnHd_fCRGJKoO1krGjU5cEBrGj2nqJlw',
+    appId: '1:30985386132:web:daddc292d0e9fe1f8d9c81',
+    messagingSenderId: '30985386132',
+    projectId: 'cannonbutchery',
+    authDomain: 'cannonbutchery.firebaseapp.com',
+    storageBucket: 'cannonbutchery.firebasestorage.app',
+    measurementId: 'G-C6M5XJ70ER',
+  );
+
 }

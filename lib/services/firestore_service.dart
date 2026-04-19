@@ -361,6 +361,10 @@ class FirestoreService {
     await _sales.doc(sale.id).set(sale.toFirestore());
   }
 
+  static Future<void> updateSalePaymentMethod(String saleId, String paymentMethod) async {
+    await _sales.doc(saleId).update({'paymentMethod': paymentMethod});
+  }
+
   static Stream<List<Sale>> salesStreamForDate(String dateId) {
     final startOfDay = idToDate(dateId);
     final endOfDay = startOfDay.add(const Duration(days: 1));

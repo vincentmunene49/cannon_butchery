@@ -117,7 +117,7 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
   bool _loadingProducts = true;
 
   Product? _selectedProduct;
-  final _amountCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController(); // For weight-based: KES amount; for unit-based: units
   String _paymentMethod = 'mpesa';
   bool _saving = false;
 
@@ -145,15 +145,38 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
   }
 
   double get _price => _selectedProduct?.currentPrice ?? 0;
-  double get _amount => double.tryParse(_amountCtrl.text) ?? 0;
-  double get _total => _amount * _price;
+  double get _inputValue => double.tryParse(_amountCtrl.text) ?? 0;
+
+  // For weight-based: amount = kg calculated from KES; total = KES entered
+  // For unit-based: amount = units entered; total = units × price
+  double get _amount {
+    if (_selectedProduct == null) return 0;
+    if (_selectedProduct!.isWeightBased) {
+      // KES amount entered ÷ price per kg = kg
+      return _price > 0 ? _inputValue / _price : 0;
+    } else {
+      // Units entered directly
+      return _inputValue;
+    }
+  }
+
+  double get _total {
+    if (_selectedProduct == null) return 0;
+    if (_selectedProduct!.isWeightBased) {
+      // Employee entered KES amount directly
+      return _inputValue;
+    } else {
+      // Units × price per unit
+      return _inputValue * _price;
+    }
+  }
 
   bool get _canRecord =>
-      _selectedProduct != null && _amount > 0 && !_saving;
+      _selectedProduct != null && _inputValue > 0 && !_saving;
 
   Future<void> _recordSale() async {
     final product = _selectedProduct;
-    if (product == null || _amount <= 0) return;
+    if (product == null || _inputValue <= 0) return;
 
     setState(() => _saving = true);
     try {
@@ -163,9 +186,9 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
         productId: product.id,
         productName: product.name,
         productType: product.type,
-        amount: _amount,
+        amount: _amount, // kg or units
         priceUsed: _price,
-        total: _total,
+        total: _total, // KES
         paymentMethod: _paymentMethod,
         createdAt: DateTime.now(),
       );
@@ -261,25 +284,26 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
                 ),
                 const SizedBox(height: 14),
 
-                // Amount
+                // Input field — Weight-based: KES amount; Unit-based: units
                 TextFormField(
                   controller: _amountCtrl,
                   enabled: _selectedProduct != null,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: _selectedProduct?.isWeightBased == false
-                      ? [FilteringTextInputFormatter.digitsOnly]
-                      : [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+                  ],
                   decoration: InputDecoration(
                     labelText: _selectedProduct?.isWeightBased ?? true
-                        ? 'Weight (kg)'
+                        ? 'Amount (KES)'
                         : 'Units',
-                    suffixText: _selectedProduct?.isWeightBased ?? true ? 'kg' : 'units',
+                    prefixText: _selectedProduct?.isWeightBased ?? true ? 'KES ' : null,
+                    suffixText: _selectedProduct?.isWeightBased == false ? 'units' : null,
                     hintText: '0',
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                // Price — read-only
+                // Price — read-only, greyed out
                 TextField(
                   enabled: false,
                   decoration: InputDecoration(
@@ -300,12 +324,15 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
                 ),
                 const SizedBox(height: 14),
 
-                // Total — read-only
+                // Calculated field — Weight-based: kg equivalent; Unit-based: total
                 TextField(
                   enabled: false,
                   decoration: InputDecoration(
-                    labelText: 'Total (KES)',
-                    prefixText: 'KES ',
+                    labelText: _selectedProduct?.isWeightBased ?? true
+                        ? 'Kg equivalent'
+                        : 'Total (KES)',
+                    prefixText: _selectedProduct?.isWeightBased == false ? 'KES ' : null,
+                    suffixText: _selectedProduct?.isWeightBased ?? true ? 'kg' : null,
                     filled: true,
                     fillColor: Colors.grey[100],
                     disabledBorder: OutlineInputBorder(
@@ -314,12 +341,13 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
                     ),
                   ),
                   controller: TextEditingController(
-                      text: _selectedProduct != null && _amount > 0
-                          ? _total.toStringAsFixed(2)
+                      text: _selectedProduct != null && _inputValue > 0
+                          ? (_selectedProduct!.isWeightBased
+                              ? _amount.toStringAsFixed(2)
+                              : _total.toStringAsFixed(2))
                           : '—'),
                   style: TextStyle(
-                    color: Colors.grey[800],
-                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -424,7 +452,7 @@ class _TodaySalesList extends StatelessWidget {
           children: sales
               .map((s) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: _SaleTile(sale: s),
+                    child: _SaleTile(sale: s, isToday: true),
                   ))
               .toList(),
         );
@@ -509,7 +537,35 @@ class _HistoryTab extends StatelessWidget {
 
 class _SaleTile extends StatelessWidget {
   final Sale sale;
-  const _SaleTile({required this.sale});
+  final bool isToday;
+  const _SaleTile({required this.sale, this.isToday = false});
+
+  Future<void> _editPaymentMethod(BuildContext context) async {
+    final newMethod = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _PaymentMethodDialog(currentMethod: sale.paymentMethod),
+    );
+    if (newMethod != null && newMethod != sale.paymentMethod) {
+      try {
+        await FirestoreService.updateSalePaymentMethod(sale.id, newMethod);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment method updated ✓'),
+              backgroundColor: kGreen,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -554,7 +610,27 @@ class _SaleTile extends StatelessWidget {
                         color: kPrimary,
                       )),
               const SizedBox(height: 4),
-              _PaymentBadge(method: sale.paymentMethod),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _PaymentBadge(method: sale.paymentMethod),
+                  if (isToday) ...[
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () => _editPaymentMethod(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
         ],
@@ -586,6 +662,64 @@ class _PaymentBadge extends StatelessWidget {
           color: isMpesa ? const Color(0xFF2E7D32) : const Color(0xFF795548),
         ),
       ),
+    );
+  }
+}
+
+// ─── Payment Method Edit Dialog ───────────────────────────────────────────────
+
+class _PaymentMethodDialog extends StatefulWidget {
+  final String currentMethod;
+  const _PaymentMethodDialog({required this.currentMethod});
+
+  @override
+  State<_PaymentMethodDialog> createState() => _PaymentMethodDialogState();
+}
+
+class _PaymentMethodDialogState extends State<_PaymentMethodDialog> {
+  late String _selectedMethod;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMethod = widget.currentMethod;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Change payment method'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RadioListTile<String>(
+            value: 'mpesa',
+            groupValue: _selectedMethod,
+            onChanged: (value) => setState(() => _selectedMethod = value!),
+            title: const Text('M-Pesa'),
+            contentPadding: EdgeInsets.zero,
+            activeColor: kPrimary,
+          ),
+          RadioListTile<String>(
+            value: 'cash',
+            groupValue: _selectedMethod,
+            onChanged: (value) => setState(() => _selectedMethod = value!),
+            title: const Text('Cash'),
+            contentPadding: EdgeInsets.zero,
+            activeColor: kPrimary,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _selectedMethod),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
