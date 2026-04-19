@@ -581,6 +581,7 @@ class _StockEntryCard extends StatelessWidget {
                 labelText: 'Remaining tonight',
                 suffixText: product.isWeightBased ? 'kg' : 'units',
                 hintText: '0',
+                helperText: product.isWeightBased ? null : 'Decimals allowed (e.g., 0.5, 1.5)',
               ),
             ),
 
