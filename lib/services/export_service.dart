@@ -1,14 +1,12 @@
-import 'dart:io' if (dart.library.html) 'dart:html';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../models/product.dart';
 import '../models/daily_entry.dart';
 import '../models/stock_addition.dart';
 import '../services/firestore_service.dart';
 import '../utils/formatters.dart';
 import 'export_service_stub.dart'
-    if (dart.library.html) 'export_service_web.dart';
+    if (dart.library.html) 'export_service_web.dart'
+    if (dart.library.io) 'export_service_mobile.dart';
 
 class ExportService {
   static Future<void> exportAll() async {
@@ -16,49 +14,27 @@ class ExportService {
     final entries = await FirestoreService.getAllEntries();
     final stockAdditions = await FirestoreService.getAllStockAdditions();
 
+    final productsCsv = _buildProductsCsv(products);
+    final entriesCsv = _buildEntriesCsv(entries);
+    final stockCsv = _buildStockCsv(stockAdditions);
+
     if (kIsWeb) {
       // Web: Combine all CSVs into one file and trigger download
       final combinedCsv = StringBuffer();
-
       combinedCsv.writeln('=== PRODUCTS ===');
-      combinedCsv.writeln(_buildProductsCsv(products));
+      combinedCsv.writeln(productsCsv);
       combinedCsv.writeln('\n=== DAILY ENTRIES ===');
-      combinedCsv.writeln(_buildEntriesCsv(entries));
+      combinedCsv.writeln(entriesCsv);
       combinedCsv.writeln('\n=== STOCK ADDITIONS ===');
-      combinedCsv.writeln(_buildStockCsv(stockAdditions));
+      combinedCsv.writeln(stockCsv);
 
       downloadFile(
         combinedCsv.toString(),
         'cannon_butchery_export_${formatShortDate(DateTime.now())}.csv',
       );
     } else {
-      // Mobile: Use share_plus
-      final dir = await getTemporaryDirectory();
-      final files = <XFile>[];
-
-      // Products CSV
-      final productsCsv = _buildProductsCsv(products);
-      final productsFile = File('${dir.path}/products.csv');
-      await productsFile.writeAsString(productsCsv);
-      files.add(XFile(productsFile.path));
-
-      // Daily Entries CSV
-      final entriesCsv = _buildEntriesCsv(entries);
-      final entriesFile = File('${dir.path}/daily_entries.csv');
-      await entriesFile.writeAsString(entriesCsv);
-      files.add(XFile(entriesFile.path));
-
-      // Stock Additions CSV
-      final stockCsv = _buildStockCsv(stockAdditions);
-      final stockFile = File('${dir.path}/stock_additions.csv');
-      await stockFile.writeAsString(stockCsv);
-      files.add(XFile(stockFile.path));
-
-      await Share.shareXFiles(
-        files,
-        subject: 'Cannon Butchery Data Export',
-        text: 'Cannon Butchery data exported on ${formatDate(DateTime.now())}',
-      );
+      // Mobile: Share separate CSV files
+      await shareFiles(productsCsv, entriesCsv, stockCsv);
     }
   }
 
