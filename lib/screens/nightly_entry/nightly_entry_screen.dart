@@ -42,6 +42,8 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
   Map<String, double> _priceByProduct = {};
   // Yesterday's wastage bag weights per product (empty on Day 1)
   Map<String, double> _yesterdayBagWeights = {};
+  // New batch detection per product (yesterday = 0, today has additions)
+  Map<String, bool> _isNewBatchByProduct = {};
 
   final Map<String, TextEditingController> _remainingControllers = {};
   final Map<String, TextEditingController> _bagWeightControllers = {};
@@ -89,11 +91,25 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
           ? <String, double>{}
           : await FirestoreService.getYesterdayWastageBagWeights(_today);
 
+      // Get yesterday's remaining stock to detect new batches
+      final yesterdayProductEntries = isDay1
+          ? <String, double>{}
+          : await FirestoreService.getProductEntriesForDate(yesterdayId)
+              .then((entries) => {for (final e in entries) e.productId: e.remainingStock});
+
       // Stock added per product
       final stockAddedMap = <String, double>{};
       for (final a in additions) {
         stockAddedMap[a.productId] =
             (stockAddedMap[a.productId] ?? 0) + a.sellableAmount;
+      }
+
+      // Detect new batch per product: yesterday = 0 AND today has stock additions
+      final isNewBatch = <String, bool>{};
+      for (final p in activeProducts) {
+        final yesterdayRemaining = yesterdayProductEntries[p.id] ?? 0;
+        final todayAdded = stockAddedMap[p.id] ?? 0;
+        isNewBatch[p.id] = yesterdayRemaining == 0 && todayAdded > 0;
       }
 
       // Price per product
@@ -139,6 +155,7 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
         _stockAddedByProduct = stockAddedMap;
         _priceByProduct = priceMap;
         _yesterdayBagWeights = yesterdayBags;
+        _isNewBatchByProduct = isNewBatch;
         _isDay1Wastage = isDay1;
         _remainingControllers.addAll(remainingMap);
         _bagWeightControllers.addAll(bagMap);
@@ -183,6 +200,10 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
     final tonight = _wastageBagFor(p);
     if (tonight == null) return null;
     if (_isDay1Wastage) return null; // Day 1: just recording, no delta yet
+
+    // New batch detection: yesterday = 0 kg AND today has stock additions
+    if (_isNewBatchByProduct[p.id] == true) return null; // Baseline for new batch
+
     final yesterday = _yesterdayBagWeights[p.id];
     if (yesterday == null) return null;
     final delta = tonight - yesterday;
@@ -437,6 +458,7 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
                 remainingController: _remainingControllers[p.id]!,
                 bagWeightController: _bagWeightControllers[p.id],
                 isDay1Wastage: _isDay1Wastage,
+                isNewBatch: _isNewBatchByProduct[p.id] ?? false,
                 yesterdayBagWeight: _yesterdayBagWeights[p.id],
                 onChanged: () => setState(() {}),
               )),
@@ -472,6 +494,7 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
                 minimumExpected: _minimumExpectedFor(p),
                 price: _priceByProduct[p.id] ?? p.currentPrice,
                 isDay1Wastage: _isDay1Wastage,
+                isNewBatch: _isNewBatchByProduct[p.id] ?? false,
                 hasWastageBag: _wastageBagFor(p) != null,
               )),
 
@@ -519,6 +542,7 @@ class _StockEntryCard extends StatelessWidget {
   final TextEditingController remainingController;
   final TextEditingController? bagWeightController;
   final bool isDay1Wastage;
+  final bool isNewBatch;
   final double? yesterdayBagWeight;
   final VoidCallback onChanged;
 
@@ -529,6 +553,7 @@ class _StockEntryCard extends StatelessWidget {
     required this.remainingController,
     required this.bagWeightController,
     required this.isDay1Wastage,
+    required this.isNewBatch,
     required this.yesterdayBagWeight,
     required this.onChanged,
   });
@@ -603,9 +628,11 @@ class _StockEntryCard extends StatelessWidget {
                   hintText: '0',
                   helperText: isDay1Wastage
                       ? 'Day 1 — recording for reference, tracking starts tomorrow'
-                      : yesterdayBagWeight != null
-                          ? 'Last night: ${yesterdayBagWeight!.toStringAsFixed(2)} kg'
-                          : 'No last night data',
+                      : isNewBatch
+                          ? 'New batch detected — baseline recorded, tracking starts tomorrow'
+                          : yesterdayBagWeight != null
+                              ? 'Last night: ${yesterdayBagWeight!.toStringAsFixed(2)} kg'
+                              : 'No last night data',
                 ),
               ),
             ],
@@ -798,6 +825,7 @@ class _ReviewCard extends StatelessWidget {
   final double minimumExpected;
   final double price;
   final bool isDay1Wastage;
+  final bool isNewBatch;
   final bool hasWastageBag;
 
   const _ReviewCard({
@@ -810,6 +838,7 @@ class _ReviewCard extends StatelessWidget {
     required this.minimumExpected,
     required this.price,
     required this.isDay1Wastage,
+    required this.isNewBatch,
     required this.hasWastageBag,
   });
 
@@ -860,6 +889,31 @@ class _ReviewCard extends StatelessWidget {
                           'Wastage tracking starts tomorrow',
                           style: TextStyle(
                               fontSize: 11, color: Colors.blue[700]),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (isNewBatch && hasWastageBag)
+                // New batch: baseline recorded
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.refresh_rounded,
+                            size: 14, color: Colors.green[700]),
+                        const SizedBox(width: 6),
+                        Text(
+                          'New batch — baseline recorded',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.green[700]),
                         ),
                       ],
                     ),
