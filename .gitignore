@@ -1,0 +1,11 @@
+# Ignore everything except web build output
+/*
+!.gitignore
+!/assets/
+!/canvaskit/
+!/icons/
+!/*.html
+!/*.js
+!/*.json
+!/*.png
+!.last_build_id
