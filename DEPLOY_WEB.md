@@ -57,17 +57,30 @@ GitHub Pages takes 1-2 minutes to update after each push.
 Whenever you make changes to the app:
 
 ```bash
-# From project root
-./build_web.sh
+# 1. Make sure you're on main with latest changes
+git checkout main
+git pull origin main
 
-# Deploy
-cd build/web
+# 2. Build web
+flutter build web --release --base-href "/cannon_butchery/"
+
+# 3. Copy build to temp (so it doesn't get deleted when switching branches)
+cp -r build/web /tmp/web_deploy
+
+# 4. Switch to gh-pages and deploy
+git checkout gh-pages
+cp -r /tmp/web_deploy/* .
 git add .
-git commit -m "Update: describe your changes"
-git push
+git commit -m "Deploy: describe your changes"
+git push origin gh-pages
+
+# 5. Switch back to main
+git checkout main
 ```
 
-Wait 1-2 minutes, then refresh your app in the browser.
+Wait 1-2 minutes, then refresh your app in the browser (Cmd+Shift+R for hard refresh).
+
+**Note:** Your gh-pages is a branch in the main repo, not a separate directory. The temp copy step prevents build files from disappearing when switching branches.
 
 ---
 
