@@ -117,7 +117,8 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
   bool _loadingProducts = true;
 
   Product? _selectedProduct;
-  final _amountCtrl = TextEditingController(); // For weight-based: KES amount; for unit-based: units
+  final _amountCtrl =
+      TextEditingController(); // For weight-based: KES amount; for unit-based: units
   String _paymentMethod = 'mpesa';
   bool _saving = false;
 
@@ -251,7 +252,7 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
 
                 // Product dropdown — no prices shown
                 DropdownButtonFormField<Product>(
-                  value: _selectedProduct,
+                  initialValue: _selectedProduct,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Product'),
                   hint: const Text('Select a product'),
@@ -288,7 +289,8 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
                 TextFormField(
                   controller: _amountCtrl,
                   enabled: _selectedProduct != null,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                   ],
@@ -296,8 +298,11 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
                     labelText: _selectedProduct?.isWeightBased ?? true
                         ? 'Amount (KES)'
                         : 'Units',
-                    prefixText: _selectedProduct?.isWeightBased ?? true ? 'KES ' : null,
-                    suffixText: _selectedProduct?.isWeightBased == false ? 'units' : null,
+                    prefixText:
+                        _selectedProduct?.isWeightBased ?? true ? 'KES ' : null,
+                    suffixText: _selectedProduct?.isWeightBased == false
+                        ? 'units'
+                        : null,
                     hintText: '0',
                   ),
                 ),
@@ -307,7 +312,8 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
                 TextField(
                   enabled: false,
                   decoration: InputDecoration(
-                    labelText: 'Price per ${_selectedProduct?.isWeightBased ?? true ? 'kg' : 'unit'}',
+                    labelText:
+                        'Price per ${_selectedProduct?.isWeightBased ?? true ? 'kg' : 'unit'}',
                     prefixText: 'KES ',
                     filled: true,
                     fillColor: Colors.grey[100],
@@ -331,8 +337,11 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
                     labelText: _selectedProduct?.isWeightBased ?? true
                         ? 'Kg equivalent'
                         : 'Total (KES)',
-                    prefixText: _selectedProduct?.isWeightBased == false ? 'KES ' : null,
-                    suffixText: _selectedProduct?.isWeightBased ?? true ? 'kg' : null,
+                    prefixText: _selectedProduct?.isWeightBased == false
+                        ? 'KES '
+                        : null,
+                    suffixText:
+                        _selectedProduct?.isWeightBased ?? true ? 'kg' : null,
                     filled: true,
                     fillColor: Colors.grey[100],
                     disabledBorder: OutlineInputBorder(
@@ -407,7 +416,6 @@ class _DailyEntryTabState extends State<_DailyEntryTab>
               ],
             ),
           ),
-
           const SizedBox(height: 24),
           Text("Today's Sales",
               style: Theme.of(context)
@@ -472,7 +480,8 @@ class _HistoryTab extends StatelessWidget {
       stream: FirestoreService.allSalesStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: kPrimary));
+          return const Center(
+              child: CircularProgressIndicator(color: kPrimary));
         }
         final sales = snapshot.data ?? [];
         if (sales.isEmpty) {
@@ -649,9 +658,7 @@ class _PaymentBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isMpesa
-            ? const Color(0xFFE8F5E9)
-            : const Color(0xFFFFF8E1),
+        color: isMpesa ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

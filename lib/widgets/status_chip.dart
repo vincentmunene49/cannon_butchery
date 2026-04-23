@@ -49,9 +49,7 @@ class PaymentBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isMpesa
-            ? const Color(0xFFE8F5E9)
-            : const Color(0xFFFFF8E1),
+        color: isMpesa ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -77,9 +75,7 @@ class TypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isWeight
-            ? const Color(0xFFE3F2FD)
-            : const Color(0xFFF3E5F5),
+        color: isWeight ? const Color(0xFFE3F2FD) : const Color(0xFFF3E5F5),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

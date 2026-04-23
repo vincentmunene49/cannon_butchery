@@ -11,8 +11,10 @@ class FirestoreService {
 
   // ─── Collections ───────────────────────────────────────────────────────────
   static CollectionReference get _products => _db.collection('products');
-  static CollectionReference get _dailyEntries => _db.collection('dailyEntries');
-  static CollectionReference get _stockAdditions => _db.collection('stockAdditions');
+  static CollectionReference get _dailyEntries =>
+      _db.collection('dailyEntries');
+  static CollectionReference get _stockAdditions =>
+      _db.collection('stockAdditions');
   static CollectionReference get _sales => _db.collection('sales');
 
   // ─── Products ──────────────────────────────────────────────────────────────
@@ -42,7 +44,8 @@ class FirestoreService {
     await _products.doc(product.id).update(product.toFirestore());
   }
 
-  static Future<void> updateProductPrice(String productId, double newPrice) async {
+  static Future<void> updateProductPrice(
+      String productId, double newPrice) async {
     final productRef = _products.doc(productId);
     final snap = await productRef.get();
     final oldPrice = (snap.data() as Map<String, dynamic>)['currentPrice'] ?? 0;
@@ -61,9 +64,7 @@ class FirestoreService {
 
   static Future<bool> productHasEntries(String productId) async {
     // Check if any daily entry's productEntries subcollection references this product
-    final snap = await _dailyEntries
-        .limit(1)
-        .get();
+    final snap = await _dailyEntries.limit(1).get();
     for (final doc in snap.docs) {
       final subSnap = await _dailyEntries
           .doc(doc.id)
@@ -86,7 +87,8 @@ class FirestoreService {
     if (!productSnap.exists) return 0;
 
     final currentPrice =
-        ((productSnap.data() as Map<String, dynamic>)['currentPrice'] ?? 0).toDouble();
+        ((productSnap.data() as Map<String, dynamic>)['currentPrice'] ?? 0)
+            .toDouble();
 
     // Check price history for any price that was effective on or before the given date
     final historySnap = await _products
@@ -98,7 +100,8 @@ class FirestoreService {
         .get();
 
     if (historySnap.docs.isNotEmpty) {
-      return ((historySnap.docs.first.data())['price'] ?? currentPrice).toDouble();
+      return ((historySnap.docs.first.data())['price'] ?? currentPrice)
+          .toDouble();
     }
     return currentPrice;
   }
@@ -118,8 +121,10 @@ class FirestoreService {
     return DailyEntry.fromFirestore(snap);
   }
 
-  static Future<List<ProductEntry>> getProductEntriesForDate(String dateId) async {
-    final snap = await _dailyEntries.doc(dateId).collection('productEntries').get();
+  static Future<List<ProductEntry>> getProductEntriesForDate(
+      String dateId) async {
+    final snap =
+        await _dailyEntries.doc(dateId).collection('productEntries').get();
     return snap.docs.map((d) => ProductEntry.fromFirestore(d)).toList();
   }
 
@@ -163,7 +168,8 @@ class FirestoreService {
 
   // Get opening balances for a date (= previous day's closing balances,
   // or today's Day 1 setup balances, or initial config)
-  static Future<Map<String, double>> getOpeningBalancesForDate(DateTime date) async {
+  static Future<Map<String, double>> getOpeningBalancesForDate(
+      DateTime date) async {
     final yesterday = date.subtract(const Duration(days: 1));
     final yesterdayId = dateToId(yesterday);
     final yesterdayEntry = await getEntryForDate(yesterdayId);
@@ -190,7 +196,8 @@ class FirestoreService {
   //  1. Yesterday's remainingStock (normal carry-forward)
   //  2. Today's pre-set openingStock written by Day 1 setup in Settings
   //  3. config/day1OpeningStock as final fallback
-  static Future<Map<String, double>> getOpeningStockForDate(DateTime date) async {
+  static Future<Map<String, double>> getOpeningStockForDate(
+      DateTime date) async {
     final yesterday = date.subtract(const Duration(days: 1));
     final yesterdayId = dateToId(yesterday);
     final yesterdayEntries = await getProductEntriesForDate(yesterdayId);
@@ -209,7 +216,8 @@ class FirestoreService {
 
   // ─── Stock Additions ───────────────────────────────────────────────────────
 
-  static Stream<List<StockAddition>> stockAdditionsStreamForDate(String dateId) {
+  static Stream<List<StockAddition>> stockAdditionsStreamForDate(
+      String dateId) {
     final startOfDay = idToDate(dateId);
     final endOfDay = startOfDay.add(const Duration(days: 1));
     return _stockAdditions
@@ -220,7 +228,8 @@ class FirestoreService {
         .map((s) => s.docs.map((d) => StockAddition.fromFirestore(d)).toList());
   }
 
-  static Future<List<StockAddition>> getStockAdditionsForDate(String dateId) async {
+  static Future<List<StockAddition>> getStockAdditionsForDate(
+      String dateId) async {
     final startOfDay = idToDate(dateId);
     final endOfDay = startOfDay.add(const Duration(days: 1));
     final snap = await _stockAdditions
@@ -232,8 +241,7 @@ class FirestoreService {
   }
 
   static Future<List<StockAddition>> getAllStockAdditions() async {
-    final snap =
-        await _stockAdditions.orderBy('date', descending: true).get();
+    final snap = await _stockAdditions.orderBy('date', descending: true).get();
     return snap.docs.map((d) => StockAddition.fromFirestore(d)).toList();
   }
 
@@ -263,8 +271,7 @@ class FirestoreService {
   }
 
   static Future<Map<String, double>> getDay1OpeningStock() async {
-    final snap =
-        await _db.collection('config').doc('day1OpeningStock').get();
+    final snap = await _db.collection('config').doc('day1OpeningStock').get();
     if (!snap.exists) return {};
     final data = snap.data() as Map<String, dynamic>;
     return data.map((k, v) => MapEntry(k, (v as num).toDouble()));
@@ -361,7 +368,8 @@ class FirestoreService {
     await _sales.doc(sale.id).set(sale.toFirestore());
   }
 
-  static Future<void> updateSalePaymentMethod(String saleId, String paymentMethod) async {
+  static Future<void> updateSalePaymentMethod(
+      String saleId, String paymentMethod) async {
     await _sales.doc(saleId).update({'paymentMethod': paymentMethod});
   }
 
@@ -388,8 +396,7 @@ class FirestoreService {
     return snap.docs.map((d) => Sale.fromFirestore(d)).toList();
   }
 
-  static Future<List<Sale>> getSalesForRange(
-      DateTime from, DateTime to) async {
+  static Future<List<Sale>> getSalesForRange(DateTime from, DateTime to) async {
     final snap = await _sales
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
         .where('date', isLessThan: Timestamp.fromDate(to))
@@ -401,8 +408,7 @@ class FirestoreService {
   // ─── Employee PIN ──────────────────────────────────────────────────────────
 
   static Future<String?> getEmployeePin() async {
-    final snap =
-        await _db.collection('config').doc('app_config').get();
+    final snap = await _db.collection('config').doc('app_config').get();
     if (!snap.exists) return null;
     final data = snap.data() as Map<String, dynamic>;
     return data['employeePin'] as String?;
@@ -474,7 +480,8 @@ class FirestoreService {
     // Delete products
     final productsSnap = await _products.get();
     for (final doc in productsSnap.docs) {
-      final priceHistorySnap = await doc.reference.collection('priceHistory').get();
+      final priceHistorySnap =
+          await doc.reference.collection('priceHistory').get();
       for (final ph in priceHistorySnap.docs) {
         futures.add(ph.reference.delete());
       }

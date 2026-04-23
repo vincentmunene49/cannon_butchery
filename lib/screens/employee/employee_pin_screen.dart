@@ -51,18 +51,29 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
 
   Future<void> _loadPin() async {
     final pin = await FirestoreService.getEmployeePin();
-    if (mounted) setState(() { _storedPin = pin; _loading = false; });
+    if (mounted) {
+      setState(() {
+        _storedPin = pin;
+        _loading = false;
+      });
+    }
   }
 
   void _onDigit(String digit) {
     if (_entered.length >= 4) return;
-    setState(() { _entered += digit; _error = false; });
+    setState(() {
+      _entered += digit;
+      _error = false;
+    });
     if (_entered.length == 4) _checkPin();
   }
 
   void _onBackspace() {
     if (_entered.isEmpty) return;
-    setState(() { _entered = _entered.substring(0, _entered.length - 1); _error = false; });
+    setState(() {
+      _entered = _entered.substring(0, _entered.length - 1);
+      _error = false;
+    });
   }
 
   Future<void> _checkPin() async {
@@ -73,7 +84,10 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
       widget.onSuccess();
     } else {
       _shakeCtrl.forward(from: 0);
-      setState(() { _error = true; _entered = ''; });
+      setState(() {
+        _error = true;
+        _entered = '';
+      });
     }
   }
 
@@ -81,7 +95,9 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, _) { if (!didPop) widget.onBack(); },
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) widget.onBack();
+      },
       child: Scaffold(
         backgroundColor: kBackground,
         body: SafeArea(
@@ -129,7 +145,7 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
     return Column(
       children: [
         const Spacer(flex: 2),
-        Icon(Icons.lock_open_outlined, size: 52, color: kPrimary),
+        const Icon(Icons.lock_open_outlined, size: 52, color: kPrimary),
         const SizedBox(height: 20),
         const Text('Employee Access',
             style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
@@ -141,8 +157,8 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
         // PIN dots
         AnimatedBuilder(
           animation: _shakeAnim,
-          builder: (_, child) =>
-              Transform.translate(offset: Offset(_shakeAnim.value, 0), child: child),
+          builder: (_, child) => Transform.translate(
+              offset: Offset(_shakeAnim.value, 0), child: child),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(4, (i) {
@@ -153,13 +169,10 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
                 margin: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: filled
-                      ? (_error ? kRed : kPrimary)
-                      : Colors.grey[200],
+                  color: filled ? (_error ? kRed : kPrimary) : Colors.grey[200],
                   border: Border.all(
-                    color: filled
-                        ? (_error ? kRed : kPrimary)
-                        : Colors.grey[300]!,
+                    color:
+                        filled ? (_error ? kRed : kPrimary) : Colors.grey[300]!,
                     width: 2,
                   ),
                 ),
@@ -173,7 +186,8 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
           opacity: _error ? 1 : 0,
           duration: const Duration(milliseconds: 200),
           child: const Text('Incorrect PIN',
-              style: TextStyle(color: kRed, fontWeight: FontWeight.w600, fontSize: 13)),
+              style: TextStyle(
+                  color: kRed, fontWeight: FontWeight.w600, fontSize: 13)),
         ),
 
         const Spacer(flex: 2),
@@ -235,9 +249,11 @@ class _EmployeePinScreenState extends State<EmployeePinScreen>
       child: Container(
         width: 72,
         height: 72,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey[100]),
+        decoration:
+            BoxDecoration(shape: BoxShape.circle, color: Colors.grey[100]),
         alignment: Alignment.center,
-        child: const Icon(Icons.backspace_outlined, size: 26, color: Colors.black54),
+        child: const Icon(Icons.backspace_outlined,
+            size: 26, color: Colors.black54),
       ),
     );
   }

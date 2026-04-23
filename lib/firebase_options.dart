@@ -14,7 +14,7 @@ import 'package:flutter/foundation.dart'
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-      return web;
+    return web;
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -44,8 +44,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '30985386132',
     projectId: 'cannonbutchery',
     storageBucket: 'cannonbutchery.firebasestorage.app',
-    androidClientId: '30985386132-hhr7qj9rbgpn51je39mkosk43kv2qmjt.apps.googleusercontent.com',
-    iosClientId: '30985386132-693f6u240u051ea8h22vff142ac64pvs.apps.googleusercontent.com',
+    androidClientId:
+        '30985386132-hhr7qj9rbgpn51je39mkosk43kv2qmjt.apps.googleusercontent.com',
+    iosClientId:
+        '30985386132-693f6u240u051ea8h22vff142ac64pvs.apps.googleusercontent.com',
     iosBundleId: 'com.cannon.butchery.tracker',
   );
 
@@ -60,5 +62,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'cannonbutchery.firebasestorage.app',
     measurementId: 'G-C6M5XJ70ER',
   );
-
 }

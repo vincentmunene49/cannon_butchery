@@ -42,7 +42,8 @@ class ExportService {
     final buf = StringBuffer();
     buf.writeln('ID,Name,Type,Current Price (KES),Active');
     for (final p in products) {
-      buf.writeln('${p.id},${_esc(p.name)},${p.type},${p.currentPrice},${p.isActive}');
+      buf.writeln(
+          '${p.id},${_esc(p.name)},${p.type},${p.currentPrice},${p.isActive}');
     }
     return buf.toString();
   }
@@ -69,7 +70,8 @@ class ExportService {
 
   static String _buildStockCsv(List<StockAddition> additions) {
     final buf = StringBuffer();
-    buf.writeln('Date,Product,Sellable Amount,Cost Paid (KES),Cost Per Unit,Payment Method,Note');
+    buf.writeln(
+        'Date,Product,Sellable Amount,Cost Paid (KES),Cost Per Unit,Payment Method,Note');
     for (final s in additions) {
       buf.writeln(
         '${formatShortDate(s.date)},${_esc(s.productName)},${s.sellableAmount},'

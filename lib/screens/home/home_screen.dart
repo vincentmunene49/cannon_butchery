@@ -83,7 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Expanded(
                                   child: SummaryCard(
                                     label: 'Expected Min',
-                                    value: formatCurrency(entry.totalExpectedMinimum),
+                                    value: formatCurrency(
+                                        entry.totalExpectedMinimum),
                                     icon: Icons.calculate_outlined,
                                   ),
                                 ),
@@ -124,8 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
 
                   // Per-product breakdown with employee sales reconciliation
-                  if (entry != null)
-                    _ProductBreakdownList(dateId: todayId),
+                  if (entry != null) _ProductBreakdownList(dateId: todayId),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
@@ -221,7 +221,8 @@ class _CumulativeVarianceCard extends StatelessWidget {
       future: FirestoreService.getAllEntries(),
       builder: (context, snapshot) {
         final entries = snapshot.data ?? [];
-        final cumulative = entries.fold<double>(0, (sum, e) => sum + e.variance);
+        final cumulative =
+            entries.fold<double>(0, (sum, e) => sum + e.variance);
         final isOk = cumulative >= 0;
 
         return AppCard(
@@ -295,7 +296,12 @@ class _ProductBreakdownListState extends State<_ProductBreakdownList> {
   void initState() {
     super.initState();
     FirestoreService.getProductEntriesForDate(widget.dateId).then((entries) {
-      if (mounted) setState(() { _productEntries = entries; _loadingEntries = false; });
+      if (mounted) {
+        setState(() {
+          _productEntries = entries;
+          _loadingEntries = false;
+        });
+      }
     });
   }
 
@@ -386,8 +392,8 @@ class _ProductBreakdownListState extends State<_ProductBreakdownList> {
                       _row(context, 'Stock expected min',
                           formatCurrency(pe.minimumExpected)),
                       if (hasSales) ...[
-                        _row(context, 'Employee logged',
-                            formatCurrency(logged)),
+                        _row(
+                            context, 'Employee logged', formatCurrency(logged)),
                         // Payment split sub-rows — only for this product's sales
                         if (productHasSales) ...[
                           _subRow(context, 'M-Pesa', formatCurrency(mpesa)),

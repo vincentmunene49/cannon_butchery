@@ -78,7 +78,8 @@ ThemeData buildAppTheme() {
       indicatorColor: kPrimary.withValues(alpha: 0.15),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: kPrimary);
+          return GoogleFonts.poppins(
+              fontSize: 11, fontWeight: FontWeight.w600, color: kPrimary);
         }
         return GoogleFonts.poppins(fontSize: 11, color: Colors.grey[600]);
       }),

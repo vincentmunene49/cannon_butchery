@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app_theme.dart';
@@ -7,7 +6,6 @@ import '../../models/product.dart';
 import '../../models/product_entry.dart';
 import '../../models/stock_addition.dart';
 import '../../services/firestore_service.dart';
-import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
@@ -58,8 +56,12 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
 
   @override
   void dispose() {
-    for (final c in _remainingControllers.values) c.dispose();
-    for (final c in _bagWeightControllers.values) c.dispose();
+    for (final c in _remainingControllers.values) {
+      c.dispose();
+    }
+    for (final c in _bagWeightControllers.values) {
+      c.dispose();
+    }
     _mpesaClosingCtrl.dispose();
     _cashClosingCtrl.dispose();
     super.dispose();
@@ -79,12 +81,10 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
       final existingEntry = await FirestoreService.getEntryForDate(_todayId);
 
       // Determine whether yesterday had a completed entry
-      final yesterdayId =
-          dateToId(_today.subtract(const Duration(days: 1)));
+      final yesterdayId = dateToId(_today.subtract(const Duration(days: 1)));
       final yesterdayEntry =
           await FirestoreService.getEntryForDate(yesterdayId);
-      final isDay1 =
-          yesterdayEntry == null || !yesterdayEntry.isCompleted;
+      final isDay1 = yesterdayEntry == null || !yesterdayEntry.isCompleted;
 
       // Yesterday's bag weights (needed for actualWastage calculation)
       final yesterdayBags = isDay1
@@ -94,8 +94,9 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
       // Get yesterday's remaining stock to detect new batches
       final yesterdayProductEntries = isDay1
           ? <String, double>{}
-          : await FirestoreService.getProductEntriesForDate(yesterdayId)
-              .then((entries) => {for (final e in entries) e.productId: e.remainingStock});
+          : await FirestoreService.getProductEntriesForDate(yesterdayId).then(
+              (entries) =>
+                  {for (final e in entries) e.productId: e.remainingStock});
 
       // Stock added per product
       final stockAddedMap = <String, double>{};
@@ -202,7 +203,9 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
     if (_isDay1Wastage) return null; // Day 1: just recording, no delta yet
 
     // New batch detection: yesterday = 0 kg AND today has stock additions
-    if (_isNewBatchByProduct[p.id] == true) return null; // Baseline for new batch
+    if (_isNewBatchByProduct[p.id] == true) {
+      return null; // Baseline for new batch
+    }
 
     final yesterday = _yesterdayBagWeights[p.id];
     if (yesterday == null) return null;
@@ -350,8 +353,12 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
         );
         _mpesaClosingCtrl.clear();
         _cashClosingCtrl.clear();
-        for (final c in _remainingControllers.values) c.clear();
-        for (final c in _bagWeightControllers.values) c.clear();
+        for (final c in _remainingControllers.values) {
+          c.clear();
+        }
+        for (final c in _bagWeightControllers.values) {
+          c.clear();
+        }
         setState(() => _hasExistingEntry = false);
       }
     } catch (e) {
@@ -588,8 +595,7 @@ class _StockEntryCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 _InfoPill('Added', formatWeight(added, product.type)),
                 const SizedBox(width: 8),
-                _InfoPill(
-                    'Available', formatWeight(available, product.type),
+                _InfoPill('Available', formatWeight(available, product.type),
                     highlight: true),
               ],
             ),
@@ -606,7 +612,9 @@ class _StockEntryCard extends StatelessWidget {
                 labelText: 'Remaining tonight',
                 suffixText: product.isWeightBased ? 'kg' : 'units',
                 hintText: '0',
-                helperText: product.isWeightBased ? null : 'Decimals allowed (e.g., 0.5, 1.5)',
+                helperText: product.isWeightBased
+                    ? null
+                    : 'Decimals allowed (e.g., 0.5, 1.5)',
               ),
             ),
 
@@ -618,8 +626,7 @@ class _StockEntryCard extends StatelessWidget {
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d+\.?\d{0,3}')),
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
                 ],
                 onChanged: (_) => onChanged(),
                 decoration: InputDecoration(
@@ -721,8 +728,7 @@ class _MoneySection extends StatelessWidget {
         children: [
           TextFormField(
             controller: mpesaClosingCtrl,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
             ],
@@ -747,8 +753,7 @@ class _MoneySection extends StatelessWidget {
           const Divider(height: 24),
           TextFormField(
             controller: cashClosingCtrl,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
             ],
@@ -867,15 +872,14 @@ class _ReviewCard extends StatelessWidget {
             const SizedBox(height: 10),
             _row(context, 'Available → Remaining → Sold',
                 '${formatWeight(available, product.type)} → ${formatWeight(remaining, product.type)} → ${formatWeight(estimated, product.type)}'),
-
             if (product.isWeightBased) ...[
               if (isDay1Wastage && hasWastageBag)
                 // Day 1: just recorded, no calculation yet
                 Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.blue[50],
                       borderRadius: BorderRadius.circular(6),
@@ -887,8 +891,8 @@ class _ReviewCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           'Wastage tracking starts tomorrow',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.blue[700]),
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.blue[700]),
                         ),
                       ],
                     ),
@@ -899,8 +903,8 @@ class _ReviewCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.green[50],
                       borderRadius: BorderRadius.circular(6),
@@ -912,8 +916,8 @@ class _ReviewCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           'New batch — baseline recorded',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.green[700]),
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.green[700]),
                         ),
                       ],
                     ),
@@ -922,12 +926,12 @@ class _ReviewCard extends StatelessWidget {
               else if (!isDay1Wastage && actualWastage != null) ...[
                 _row(context, 'Actual wastage',
                     formatWeight(actualWastage!, product.type)),
-                _row(context, 'Buffer', formatWeight(_kWastageBuffer, product.type)),
+                _row(context, 'Buffer',
+                    formatWeight(_kWastageBuffer, product.type)),
                 _row(context, 'Accountable sold',
                     formatWeight(accountable, product.type)),
               ],
             ],
-
             _row(context, 'Price used',
                 '${formatCurrency(price)} / ${product.isWeightBased ? 'kg' : 'unit'}'),
             const Divider(height: 16),
@@ -1003,8 +1007,8 @@ class _OverallSummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _summaryRow(context, 'Total expected minimum',
-              formatCurrency(totalExpected)),
+          _summaryRow(
+              context, 'Total expected minimum', formatCurrency(totalExpected)),
           _summaryRow(context, 'Total received', formatCurrency(totalReceived)),
           const Divider(),
           _summaryRow(context, 'Variance', formatVariance(variance),
@@ -1012,8 +1016,7 @@ class _OverallSummary extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
               color: isOk ? kGreen : kRed,
               borderRadius: BorderRadius.circular(10),
@@ -1022,9 +1025,7 @@ class _OverallSummary extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  isOk
-                      ? Icons.check_circle_rounded
-                      : Icons.warning_rounded,
+                  isOk ? Icons.check_circle_rounded : Icons.warning_rounded,
                   color: Colors.white,
                   size: 20,
                 ),

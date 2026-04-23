@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -6,7 +5,6 @@ import '../../app_theme.dart';
 import '../../models/product.dart';
 import '../../models/stock_addition.dart';
 import '../../services/firestore_service.dart';
-import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
@@ -101,8 +99,7 @@ class _StockScreenState extends State<StockScreen> {
   @override
   Widget build(BuildContext context) {
     final todayId = dateToId(DateTime.now());
-    final unitLabel =
-        _selectedProduct?.isWeightBased == true ? 'kg' : 'units';
+    final unitLabel = _selectedProduct?.isWeightBased == true ? 'kg' : 'units';
 
     return Scaffold(
       backgroundColor: kBackground,
@@ -110,14 +107,14 @@ class _StockScreenState extends State<StockScreen> {
       body: _productsLoading
           ? const LoadingWidget()
           : _products.isEmpty
-              ? EmptyState(
+              ? const EmptyState(
                   icon: Icons.shopping_bag_outlined,
                   title: 'No active products',
-                  subtitle: 'Add products in Settings before logging purchases.',
+                  subtitle:
+                      'Add products in Settings before logging purchases.',
                 )
               : StreamBuilder<List<StockAddition>>(
-                  stream:
-                      FirestoreService.stockAdditionsStreamForDate(todayId),
+                  stream: FirestoreService.stockAdditionsStreamForDate(todayId),
                   builder: (context, snapshot) {
                     final todayItems = snapshot.data ?? [];
                     return CustomScrollView(
@@ -147,8 +144,7 @@ class _StockScreenState extends State<StockScreen> {
                         // ── Today's purchases ──────────────────────────
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
                             child: Text(
                               "Today's Purchases",
                               style: Theme.of(context)
@@ -159,8 +155,7 @@ class _StockScreenState extends State<StockScreen> {
                           ),
                         ),
 
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting)
+                        if (snapshot.connectionState == ConnectionState.waiting)
                           const SliverToBoxAdapter(
                             child: Padding(
                               padding: EdgeInsets.all(24),
@@ -170,10 +165,10 @@ class _StockScreenState extends State<StockScreen> {
                             ),
                           )
                         else if (todayItems.isEmpty)
-                          SliverToBoxAdapter(
+                          const SliverToBoxAdapter(
                             child: Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
+                                  EdgeInsets.symmetric(horizontal: 16),
                               child: AppCard(
                                 child: EmptyState(
                                   icon: Icons.receipt_long_outlined,
@@ -188,10 +183,10 @@ class _StockScreenState extends State<StockScreen> {
                           SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (context, index) => Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                    16, 0, 16, 8),
-                                child: _PurchaseItem(
-                                    addition: todayItems[index]),
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                child:
+                                    _PurchaseItem(addition: todayItems[index]),
                               ),
                               childCount: todayItems.length,
                             ),
@@ -201,8 +196,8 @@ class _StockScreenState extends State<StockScreen> {
                         SliverToBoxAdapter(
                           child: _HistorySection(
                             expanded: _showAllHistory,
-                            onToggle: () =>
-                                setState(() => _showAllHistory = !_showAllHistory),
+                            onToggle: () => setState(
+                                () => _showAllHistory = !_showAllHistory),
                             todayId: todayId,
                           ),
                         ),
@@ -491,9 +486,7 @@ class _HistorySection extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onToggle,
             icon: Icon(
-              expanded
-                  ? Icons.keyboard_arrow_up
-                  : Icons.keyboard_arrow_down,
+              expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
               size: 20,
             ),
             label: Text(expanded ? 'Hide Full History' : 'View All History'),
@@ -556,11 +549,10 @@ class _HistorySection extends StatelessWidget {
                                     fontWeight: FontWeight.w600),
                           ),
                         ),
-                        ...items.map(
-                            (a) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: _PurchaseItem(addition: a),
-                                )),
+                        ...items.map((a) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _PurchaseItem(addition: a),
+                            )),
                       ],
                     );
                   }).toList(),

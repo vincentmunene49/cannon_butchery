@@ -5,10 +5,12 @@ import 'package:share_plus/share_plus.dart';
 import '../utils/formatters.dart';
 
 void downloadFile(String content, String filename) {
-  throw UnsupportedError('downloadFile should not be called on mobile, use shareFiles instead');
+  throw UnsupportedError(
+      'downloadFile should not be called on mobile, use shareFiles instead');
 }
 
-Future<void> shareFiles(String productsCsv, String entriesCsv, String stockCsv) async {
+Future<void> shareFiles(
+    String productsCsv, String entriesCsv, String stockCsv) async {
   final dir = await getTemporaryDirectory();
   final files = <XFile>[];
 

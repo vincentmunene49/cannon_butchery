@@ -15,7 +15,8 @@ void main() async {
 
   // Initialize Firebase only if not already initialized
   try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
   } catch (e) {
     if (e is FirebaseException && e.code == 'duplicate-app') {
       // Firebase already initialized, continue
@@ -25,7 +26,7 @@ void main() async {
   }
 
   // TEMPORARY: Force sign out on launch (REMOVE AFTER TESTING)
-   //await FirebaseAuth.instance.signOut();
+  //await FirebaseAuth.instance.signOut();
 
   // Enable Firestore offline persistence
   FirebaseFirestore.instance.settings = const Settings(
@@ -100,7 +101,7 @@ class _AuthGateState extends State<_AuthGate> {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return WebLayoutWrapper(
+          return const WebLayoutWrapper(
             child: Scaffold(
               body: Center(child: CircularProgressIndicator(color: kPrimary)),
             ),

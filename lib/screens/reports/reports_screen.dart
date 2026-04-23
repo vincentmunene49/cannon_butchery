@@ -1,13 +1,12 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../app_theme.dart';
 import '../../models/daily_entry.dart';
+import '../../models/product.dart';
 import '../../models/product_entry.dart';
 import '../../models/sale.dart';
 import '../../models/stock_addition.dart';
 import '../../services/firestore_service.dart';
-import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
@@ -22,7 +21,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
-  late final _tabController = TabController(length: 6, vsync: this);
+  late final _tabController = TabController(length: 7, vsync: this);
 
   @override
   void dispose() {
@@ -48,6 +47,7 @@ class _ReportsScreenState extends State<ReportsScreen>
             Tab(text: 'Accountability'),
             Tab(text: 'Trends'),
             Tab(text: 'Sales Log'),
+            Tab(text: 'Product Sales'),
           ],
         ),
       ),
@@ -60,6 +60,7 @@ class _ReportsScreenState extends State<ReportsScreen>
           _AccountabilityTab(),
           _TrendsTab(),
           _SalesTab(),
+          _ProductSalesTab(),
         ],
       ),
     );
@@ -131,8 +132,7 @@ class _DailyTabState extends State<_DailyTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Entry'),
-        content:
-            Text('Delete entry for ${formatShortDate(_selectedDate)}?'),
+        content: Text('Delete entry for ${formatShortDate(_selectedDate)}?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -206,10 +206,14 @@ class _DailyTabState extends State<_DailyTab> {
                                 .titleSmall
                                 ?.copyWith(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 12),
-                        _kv('M-Pesa received', formatCurrency(_entry!.mpesaReceived)),
-                        _kv('Cash received', formatCurrency(_entry!.cashReceived)),
+                        _kv('M-Pesa received',
+                            formatCurrency(_entry!.mpesaReceived)),
+                        _kv('Cash received',
+                            formatCurrency(_entry!.cashReceived)),
                         const Divider(),
-                        _kv('Total received', formatCurrency(_entry!.totalReceived), bold: true),
+                        _kv('Total received',
+                            formatCurrency(_entry!.totalReceived),
+                            bold: true),
                       ],
                     ),
                   ),
@@ -240,10 +244,16 @@ class _DailyTabState extends State<_DailyTab> {
                               ],
                             ),
                             const SizedBox(height: 10),
-                            _kv('Opening', formatWeight(pe.openingStock, pe.productType)),
-                            _kv('Added', formatWeight(pe.stockAdded, pe.productType)),
-                            _kv('Remaining', formatWeight(pe.remainingStock, pe.productType)),
-                            _kv('Estimated sold', formatWeight(pe.estimatedSold, pe.productType)),
+                            _kv('Opening',
+                                formatWeight(pe.openingStock, pe.productType)),
+                            _kv('Added',
+                                formatWeight(pe.stockAdded, pe.productType)),
+                            _kv(
+                                'Remaining',
+                                formatWeight(
+                                    pe.remainingStock, pe.productType)),
+                            _kv('Estimated sold',
+                                formatWeight(pe.estimatedSold, pe.productType)),
 
                             // Wastage section — weight-based products only
                             if (pe.isWeightBased) ...[
@@ -261,20 +271,28 @@ class _DailyTabState extends State<_DailyTab> {
                                   'Tracking starts tomorrow',
                                   valueColor: Colors.blue[700],
                                 ),
-                                _kv('Accountable sold',
-                                    formatWeight(pe.estimatedSold, pe.productType)),
+                                _kv(
+                                    'Accountable sold',
+                                    formatWeight(
+                                        pe.estimatedSold, pe.productType)),
                               ] else if (pe.actualWastage != null) ...[
-                                _kv('Actual wastage',
-                                    formatWeight(pe.actualWastage!, pe.productType)),
-                                _kv('Accountable sold',
-                                    formatWeight(pe.accountableSold, pe.productType)),
+                                _kv(
+                                    'Actual wastage',
+                                    formatWeight(
+                                        pe.actualWastage!, pe.productType)),
+                                _kv(
+                                    'Accountable sold',
+                                    formatWeight(
+                                        pe.accountableSold, pe.productType)),
                               ],
                               const Divider(height: 16),
                             ],
 
                             _kv('Price used', formatCurrency(pe.priceUsed)),
                             if (!pe.isWeightBased) const Divider(),
-                            _kv('Min expected', formatCurrency(pe.minimumExpected), bold: true),
+                            _kv('Min expected',
+                                formatCurrency(pe.minimumExpected),
+                                bold: true),
                           ],
                         ),
                       ),
@@ -360,7 +378,8 @@ class _VerdictBanner extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Expected min', style: Theme.of(context).textTheme.bodyMedium),
+              Text('Expected min',
+                  style: Theme.of(context).textTheme.bodyMedium),
               Text(formatCurrency(entry.totalExpectedMinimum),
                   style: Theme.of(context)
                       .textTheme
@@ -372,7 +391,8 @@ class _VerdictBanner extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Total received', style: Theme.of(context).textTheme.bodyMedium),
+              Text('Total received',
+                  style: Theme.of(context).textTheme.bodyMedium),
               Text(formatCurrency(entry.totalReceived),
                   style: Theme.of(context)
                       .textTheme
@@ -449,8 +469,12 @@ class _RevenueTabState extends State<_RevenueTab> {
   List<DailyEntry> get _filteredEntries {
     final now = DateTime.now();
     return _entries.where((e) {
-      if (_range == 0) return e.date.isAfter(now.subtract(const Duration(days: 7)));
-      if (_range == 1) return e.date.isAfter(now.subtract(const Duration(days: 30)));
+      if (_range == 0) {
+        return e.date.isAfter(now.subtract(const Duration(days: 7)));
+      }
+      if (_range == 1) {
+        return e.date.isAfter(now.subtract(const Duration(days: 30)));
+      }
       return true;
     }).toList();
   }
@@ -500,7 +524,6 @@ class _RevenueTabState extends State<_RevenueTab> {
             ),
           ),
           const SizedBox(height: 16),
-
           if (filtered.isEmpty)
             const EmptyState(
               icon: Icons.bar_chart_outlined,
@@ -605,7 +628,9 @@ class _RevenueTabState extends State<_RevenueTab> {
                                 showTitles: true,
                                 reservedSize: 50,
                                 getTitlesWidget: (value, meta) {
-                                  if (value == 0) return const SizedBox.shrink();
+                                  if (value == 0) {
+                                    return const SizedBox.shrink();
+                                  }
                                   return Text(
                                     value >= 1000
                                         ? '${(value / 1000).toStringAsFixed(0)}K'
@@ -621,7 +646,8 @@ class _RevenueTabState extends State<_RevenueTab> {
                                 sideTitles: SideTitles(showTitles: false)),
                           ),
                           gridData: FlGridData(
-                            horizontalInterval: (sorted.first.value / 4).clamp(1.0, double.infinity),
+                            horizontalInterval: (sorted.first.value / 4)
+                                .clamp(1.0, double.infinity),
                             getDrawingHorizontalLine: (v) => FlLine(
                               color: Colors.grey[200]!,
                               strokeWidth: 1,
@@ -724,8 +750,12 @@ class _ProfitTabState extends State<_ProfitTab> {
   List<DailyEntry> get _filteredEntries {
     final now = DateTime.now();
     return _entries.where((e) {
-      if (_range == 0) return e.date.isAfter(now.subtract(const Duration(days: 7)));
-      if (_range == 1) return e.date.isAfter(now.subtract(const Duration(days: 30)));
+      if (_range == 0) {
+        return e.date.isAfter(now.subtract(const Duration(days: 7)));
+      }
+      if (_range == 1) {
+        return e.date.isAfter(now.subtract(const Duration(days: 30)));
+      }
       return true;
     }).toList();
   }
@@ -733,8 +763,12 @@ class _ProfitTabState extends State<_ProfitTab> {
   List<StockAddition> get _filteredStock {
     final now = DateTime.now();
     return _stockAdditions.where((s) {
-      if (_range == 0) return s.date.isAfter(now.subtract(const Duration(days: 7)));
-      if (_range == 1) return s.date.isAfter(now.subtract(const Duration(days: 30)));
+      if (_range == 0) {
+        return s.date.isAfter(now.subtract(const Duration(days: 7)));
+      }
+      if (_range == 1) {
+        return s.date.isAfter(now.subtract(const Duration(days: 30)));
+      }
       return true;
     }).toList();
   }
@@ -748,9 +782,8 @@ class _ProfitTabState extends State<_ProfitTab> {
     // Revenue per product (from productEntries in range)
     final revenueByProduct = <String, double>{};
     for (final pe in _productEntries) {
-      if (filteredIds.contains(dateToId(pe.openingStock > 0
-          ? DateTime.now()
-          : DateTime.now()))) {
+      if (filteredIds.contains(
+          dateToId(pe.openingStock > 0 ? DateTime.now() : DateTime.now()))) {
         // Include all product entries for simplicity (date tracking would need productEntry date)
         revenueByProduct[pe.productName] =
             (revenueByProduct[pe.productName] ?? 0) + pe.minimumExpected;
@@ -793,7 +826,6 @@ class _ProfitTabState extends State<_ProfitTab> {
             ),
           ),
           const SizedBox(height: 16),
-
           if (allProducts.isEmpty)
             const EmptyState(
               icon: Icons.pie_chart_outline,
@@ -810,7 +842,8 @@ class _ProfitTabState extends State<_ProfitTab> {
                     final cost = costByProduct[name] ?? 0;
                     final profit = rev - cost;
                     final margin = rev > 0 ? (profit / rev * 100) : 0;
-                    return _productRow(context, name, rev, cost, profit, margin);
+                    return _productRow(
+                        context, name, rev, cost, profit, margin);
                   }),
                   const Divider(thickness: 2),
                   _productRow(
@@ -839,38 +872,28 @@ class _ProfitTabState extends State<_ProfitTab> {
           Expanded(
               flex: 2,
               child: Text('Product',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w700, color: Colors.grey[600]))),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
           Expanded(
               child: Text('Revenue',
                   textAlign: TextAlign.right,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w700, color: Colors.grey[600]))),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
           Expanded(
               child: Text('Cost',
                   textAlign: TextAlign.right,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w700, color: Colors.grey[600]))),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
           Expanded(
               child: Text('Profit',
                   textAlign: TextAlign.right,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w700, color: Colors.grey[600]))),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
           Expanded(
               child: Text('Margin',
                   textAlign: TextAlign.right,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w700, color: Colors.grey[600]))),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
         ],
       ),
     );
@@ -890,32 +913,28 @@ class _ProfitTabState extends State<_ProfitTab> {
                         fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
                       ))),
           Expanded(
-              child: Text(
-                  'K${(rev / 1000).toStringAsFixed(1)}',
+              child: Text('K${(rev / 1000).toStringAsFixed(1)}',
                   textAlign: TextAlign.right,
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
                       ?.copyWith(fontWeight: bold ? FontWeight.w700 : null))),
           Expanded(
-              child: Text(
-                  'K${(cost / 1000).toStringAsFixed(1)}',
+              child: Text('K${(cost / 1000).toStringAsFixed(1)}',
                   textAlign: TextAlign.right,
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
                       ?.copyWith(fontWeight: bold ? FontWeight.w700 : null))),
           Expanded(
-              child: Text(
-                  'K${(profit / 1000).toStringAsFixed(1)}',
+              child: Text('K${(profit / 1000).toStringAsFixed(1)}',
                   textAlign: TextAlign.right,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: profit >= 0 ? kGreen : kRed,
                         fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
                       ))),
           Expanded(
-              child: Text(
-                  '${margin.toStringAsFixed(1)}%',
+              child: Text('${margin.toStringAsFixed(1)}%',
                   textAlign: TextAlign.right,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: profit >= 0 ? kGreen : kRed,
@@ -960,8 +979,7 @@ class _AccountabilityTabState extends State<_AccountabilityTab> {
   Widget build(BuildContext context) {
     if (_loading) return const LoadingWidget();
 
-    final cumulative =
-        _entries.fold<double>(0, (sum, e) => sum + e.variance);
+    final cumulative = _entries.fold<double>(0, (sum, e) => sum + e.variance);
     final flaggedCount = _entries.where((e) => e.isFlagged).length;
 
     return Column(
@@ -1026,13 +1044,13 @@ class _AccountabilityTabState extends State<_AccountabilityTab> {
             ],
           ),
         ),
-
         if (_entries.isEmpty)
           const Expanded(
             child: EmptyState(
               icon: Icons.assignment_outlined,
               title: 'No entries yet',
-              subtitle: 'Your accountability log will appear here after saving nightly entries.',
+              subtitle:
+                  'Your accountability log will appear here after saving nightly entries.',
             ),
           )
         else
@@ -1212,7 +1230,9 @@ class _TrendsTabState extends State<_TrendsTab> {
   Widget _buildFlaggedSummary() {
     int countFlagged(int days) {
       final cutoff = DateTime.now().subtract(Duration(days: days));
-      return _entries.where((e) => !e.date.isBefore(cutoff) && e.isFlagged).length;
+      return _entries
+          .where((e) => !e.date.isBefore(cutoff) && e.isFlagged)
+          .length;
     }
 
     final f7 = countFlagged(7);
@@ -1265,7 +1285,8 @@ class _TrendsTabState extends State<_TrendsTab> {
           Text(
             '$count',
             style: TextStyle(
-                fontSize: 28, fontWeight: FontWeight.w800,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
                 color: ok ? kGreen : kRed),
           ),
           const SizedBox(height: 2),
@@ -1296,7 +1317,9 @@ class _TrendsTabState extends State<_TrendsTab> {
   }
 
   LineChartData _varianceData(List<DailyEntry> data) {
-    final spots = data.asMap().entries
+    final spots = data
+        .asMap()
+        .entries
         .map((e) => FlSpot(e.key.toDouble(), e.value.variance))
         .toList();
     final ys = data.map((e) => e.variance).toList();
@@ -1325,14 +1348,16 @@ class _TrendsTabState extends State<_TrendsTab> {
       ],
       extraLinesData: ExtraLinesData(
         horizontalLines: [
-          HorizontalLine(y: 0, color: Colors.black38,
-              strokeWidth: 1, dashArray: [4, 4]),
+          HorizontalLine(
+              y: 0, color: Colors.black38, strokeWidth: 1, dashArray: [4, 4]),
         ],
       ),
       minY: minY - pad,
       maxY: maxY + pad,
-      titlesData: _buildTitlesData(data.length,
-          (i) { final d = data[i].date; return '${d.day}/${d.month}'; },
+      titlesData: _buildTitlesData(data.length, (i) {
+        final d = data[i].date;
+        return '${d.day}/${d.month}';
+      },
           leftReservedSize: 54,
           leftFormatter: (v) => v >= 1000
               ? '${(v / 1000).toStringAsFixed(0)}K'
@@ -1361,10 +1386,15 @@ class _TrendsTabState extends State<_TrendsTab> {
         Row(
           children: [
             Expanded(child: _sectionTitle('Revenue — Last 30 Days')),
-            Container(width: 20, height: 2, color: Colors.orange,
+            Container(
+                width: 20,
+                height: 2,
+                color: Colors.orange,
                 margin: const EdgeInsets.only(right: 4)),
             Text('Avg ${formatCurrency(avg)}',
-                style: const TextStyle(fontSize: 11, color: Colors.orange,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.orange,
                     fontWeight: FontWeight.w600)),
           ],
         ),
@@ -1379,8 +1409,8 @@ class _TrendsTabState extends State<_TrendsTab> {
   }
 
   BarChartData _revenueData(List<DailyEntry> data, double avg) {
-    final maxY = data.map((e) => e.totalReceived)
-        .reduce((a, b) => a > b ? a : b);
+    final maxY =
+        data.map((e) => e.totalReceived).reduce((a, b) => a > b ? a : b);
     final barW = (240.0 / data.length).clamp(4.0, 16.0);
 
     return BarChartData(
@@ -1393,19 +1423,23 @@ class _TrendsTabState extends State<_TrendsTab> {
             toY: e.value.totalReceived,
             color: kPrimary.withValues(alpha: 0.8),
             width: barW,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(4)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
           ),
         ]);
       }).toList(),
       extraLinesData: ExtraLinesData(
         horizontalLines: [
-          HorizontalLine(y: avg, color: Colors.orange,
-              strokeWidth: 1.5, dashArray: [6, 4]),
+          HorizontalLine(
+              y: avg,
+              color: Colors.orange,
+              strokeWidth: 1.5,
+              dashArray: [6, 4]),
         ],
       ),
-      titlesData: _buildTitlesData(data.length,
-          (i) { final d = data[i].date; return '${d.day}/${d.month}'; },
+      titlesData: _buildTitlesData(data.length, (i) {
+        final d = data[i].date;
+        return '${d.day}/${d.month}';
+      },
           leftReservedSize: 54,
           leftFormatter: (v) => v >= 1000
               ? '${(v / 1000).toStringAsFixed(0)}K'
@@ -1428,16 +1462,19 @@ class _TrendsTabState extends State<_TrendsTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Sales Volume Per Product — Last 30 Days'),
-        _legendChips(products, _shownVolume, (name, v) =>
-            setState(() => v ? _shownVolume.add(name) : _shownVolume.remove(name))),
+        _legendChips(
+            products,
+            _shownVolume,
+            (name, v) => setState(
+                () => v ? _shownVolume.add(name) : _shownVolume.remove(name))),
         AppCard(
           padding: const EdgeInsets.fromLTRB(4, 16, 16, 8),
           child: data.length < 2
               ? _emptyChart()
               : SizedBox(
                   height: 200,
-                  child: LineChart(_multiLineData(data, products, _shownVolume,
-                      (pe) => pe.estimatedSold,
+                  child: LineChart(_multiLineData(
+                      data, products, _shownVolume, (pe) => pe.estimatedSold,
                       yLabel: (v) => v.toStringAsFixed(0))),
                 ),
         ),
@@ -1456,8 +1493,11 @@ class _TrendsTabState extends State<_TrendsTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Wastage Bag Weight Per Product — Last 30 Days'),
-        _legendChips(products, _shownWastage, (name, v) =>
-            setState(() => v ? _shownWastage.add(name) : _shownWastage.remove(name))),
+        _legendChips(
+            products,
+            _shownWastage,
+            (name, v) => setState(() =>
+                v ? _shownWastage.add(name) : _shownWastage.remove(name))),
         AppCard(
           padding: const EdgeInsets.fromLTRB(4, 16, 16, 8),
           child: data.length < 2
@@ -1482,8 +1522,9 @@ class _TrendsTabState extends State<_TrendsTab> {
     for (final e in _entries) {
       buckets[e.date.weekday - 1].add(e.totalReceived);
     }
-    final avgs = buckets.map((b) =>
-        b.isEmpty ? 0.0 : b.fold(0.0, (a, v) => a + v) / b.length).toList();
+    final avgs = buckets
+        .map((b) => b.isEmpty ? 0.0 : b.fold(0.0, (a, v) => a + v) / b.length)
+        .toList();
     final maxAvg = avgs.reduce((a, b) => a > b ? a : b);
 
     return Column(
@@ -1520,7 +1561,9 @@ class _TrendsTabState extends State<_TrendsTab> {
                           showTitles: true,
                           getTitlesWidget: (v, _) {
                             final i = v.toInt();
-                            if (i >= labels.length) return const SizedBox.shrink();
+                            if (i >= labels.length) {
+                              return const SizedBox.shrink();
+                            }
                             return Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(labels[i],
@@ -1593,7 +1636,9 @@ class _TrendsTabState extends State<_TrendsTab> {
         dotData: FlDotData(
           show: spots.length <= 14,
           getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
-              radius: 3, color: color, strokeWidth: 0,
+              radius: 3,
+              color: color,
+              strokeWidth: 0,
               strokeColor: Colors.transparent),
         ),
         belowBarData: fillArea
@@ -1616,8 +1661,10 @@ class _TrendsTabState extends State<_TrendsTab> {
       lineBarsData: bars,
       minY: 0,
       maxY: maxY == 0 ? 10 : maxY * 1.15,
-      titlesData: _buildTitlesData(data.length,
-          (i) { final d = data[i].date; return '${d.day}/${d.month}'; },
+      titlesData: _buildTitlesData(data.length, (i) {
+        final d = data[i].date;
+        return '${d.day}/${d.month}';
+      },
           leftReservedSize: 42,
           leftFormatter: yLabel ?? (v) => v.toStringAsFixed(0)),
       gridData: FlGridData(
@@ -1635,7 +1682,9 @@ class _TrendsTabState extends State<_TrendsTab> {
   List<String> _productNamesIn(List<DailyEntry> data) {
     final s = <String>{};
     for (final e in data) {
-      for (final pe in _peByDate[e.id] ?? []) s.add(pe.productName);
+      for (final pe in _peByDate[e.id] ?? []) {
+        s.add(pe.productName);
+      }
     }
     return s.toList()..sort();
   }
@@ -1702,15 +1751,12 @@ class _TrendsTabState extends State<_TrendsTab> {
           return GestureDetector(
             onTap: () => onToggle(name, !visible),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: visible
-                    ? color.withValues(alpha: 0.12)
-                    : Colors.grey[100],
+                color:
+                    visible ? color.withValues(alpha: 0.12) : Colors.grey[100],
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: visible ? color : Colors.grey[300]!),
+                border: Border.all(color: visible ? color : Colors.grey[300]!),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1743,8 +1789,7 @@ class _TrendsTabState extends State<_TrendsTab> {
   Widget _sectionTitle(String title) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Text(title,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w700)),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
       );
 
   Widget _emptyChart() => const SizedBox(
@@ -1810,14 +1855,16 @@ class _SalesTabState extends State<_SalesTab> {
 
   List<DailyEntry> get _filteredEntries {
     final (from, to) = _dateRange;
-    return _entries.where((e) =>
-        !e.date.isBefore(from) && e.date.isBefore(to)).toList();
+    return _entries
+        .where((e) => !e.date.isBefore(from) && e.date.isBefore(to))
+        .toList();
   }
 
   List<Sale> get _filteredSales {
     final (from, to) = _dateRange;
-    return _sales.where((s) =>
-        !s.date.isBefore(from) && s.date.isBefore(to)).toList();
+    return _sales
+        .where((s) => !s.date.isBefore(from) && s.date.isBefore(to))
+        .toList();
   }
 
   @override
@@ -1831,8 +1878,7 @@ class _SalesTabState extends State<_SalesTab> {
         entries.fold<double>(0, (s, e) => s + e.totalReceived);
     final totalExpected =
         entries.fold<double>(0, (s, e) => s + e.totalExpectedMinimum);
-    final totalVariance =
-        entries.fold<double>(0, (s, e) => s + e.variance);
+    final totalVariance = entries.fold<double>(0, (s, e) => s + e.variance);
 
     final totalLogged = sales.fold<double>(0, (s, sale) => s + sale.total);
     final salesCount = sales.length;
@@ -1891,11 +1937,13 @@ class _SalesTabState extends State<_SalesTab> {
             AppCard(
               child: Column(
                 children: [
-                  _kv(context, 'Expected minimum', formatCurrency(totalExpected)),
+                  _kv(context, 'Expected minimum',
+                      formatCurrency(totalExpected)),
                   _kv(context, 'Total received', formatCurrency(totalReceived)),
                   const Divider(),
                   _kv(context, 'Variance', formatVariance(totalVariance),
-                      valueColor: totalVariance >= 0 ? kGreen : kRed, bold: true),
+                      valueColor: totalVariance >= 0 ? kGreen : kRed,
+                      bold: true),
                 ],
               ),
             ),
@@ -1912,19 +1960,27 @@ class _SalesTabState extends State<_SalesTab> {
                     )
                   : Column(
                       children: [
-                        _kv(context, 'Total logged', formatCurrency(totalLogged),
+                        _kv(context, 'Total logged',
+                            formatCurrency(totalLogged),
                             bold: true),
-                        _kv(context, 'Transactions', '$salesCount sale${salesCount == 1 ? '' : 's'}'),
+                        _kv(context, 'Transactions',
+                            '$salesCount sale${salesCount == 1 ? '' : 's'}'),
                         if (byProduct.isNotEmpty) ...[
                           const Divider(),
                           ...byProduct.entries.map((e) => Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _kv(context, e.key, formatCurrency(e.value)),
-                                  _subKv(context, 'M-Pesa',
-                                      formatCurrency(mpesaByProduct[e.key] ?? 0)),
-                                  _subKv(context, 'Cash',
-                                      formatCurrency(cashByProduct[e.key] ?? 0)),
+                                  _subKv(
+                                      context,
+                                      'M-Pesa',
+                                      formatCurrency(
+                                          mpesaByProduct[e.key] ?? 0)),
+                                  _subKv(
+                                      context,
+                                      'Cash',
+                                      formatCurrency(
+                                          cashByProduct[e.key] ?? 0)),
                                 ],
                               )),
                         ],
@@ -1943,9 +1999,7 @@ class _SalesTabState extends State<_SalesTab> {
                 children: [
                   _kv(context, 'Received vs logged',
                       formatVariance(receivedVsLogged),
-                      valueColor: receivedVsLogged >= 0
-                          ? Colors.black87
-                          : kRed,
+                      valueColor: receivedVsLogged >= 0 ? Colors.black87 : kRed,
                       bold: true),
                   _kv(context, 'Expected vs logged',
                       formatVariance(expectedVsLogged)),
@@ -2016,6 +2070,354 @@ class _SalesTabState extends State<_SalesTab> {
                   )),
         ],
       ),
+    );
+  }
+}
+
+// ─── Product Sales Tab ─────────────────────────────────────────────────────────
+
+class _ProductSalesTab extends StatefulWidget {
+  const _ProductSalesTab();
+
+  @override
+  State<_ProductSalesTab> createState() => _ProductSalesTabState();
+}
+
+class _ProductSalesTabState extends State<_ProductSalesTab> {
+  bool _loading = false;
+  bool _hasGenerated = false;
+  List<Product> _products = [];
+  String? _selectedProductId;
+  DateTime? _fromDate;
+  DateTime? _toDate;
+
+  // Results
+  double _totalRevenue = 0;
+  double _totalAmount = 0;
+  double _avgPrice = 0;
+  int _numSales = 0;
+  List<Sale> _sales = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    final products = await FirestoreService.getProducts();
+    if (mounted) {
+      setState(() {
+        _products = products;
+      });
+    }
+  }
+
+  Future<void> _pickFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fromDate ?? DateTime.now().subtract(const Duration(days: 30)),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: kPrimary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _fromDate = picked);
+    }
+  }
+
+  Future<void> _pickToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _toDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: kPrimary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _toDate = picked);
+    }
+  }
+
+  Future<void> _generateReport() async {
+    if (_selectedProductId == null || _fromDate == null || _toDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select product and date range'),
+          backgroundColor: kRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    final from = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+    final to = DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59);
+
+    final allSales = await FirestoreService.getSalesForRange(from, to);
+    final productSales = allSales
+        .where((s) => s.productId == _selectedProductId)
+        .toList();
+
+    double totalRevenue = 0;
+    double totalAmount = 0;
+    for (final sale in productSales) {
+      totalRevenue += sale.total;
+      totalAmount += sale.amount;
+    }
+
+    final avgPrice = productSales.isNotEmpty ? totalRevenue / totalAmount : 0.0;
+
+    if (mounted) {
+      setState(() {
+        _totalRevenue = totalRevenue;
+        _totalAmount = totalAmount;
+        _avgPrice = avgPrice;
+        _numSales = productSales.length;
+        _sales = productSales;
+        _hasGenerated = true;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Product',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedProductId,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  hint: const Text('Select product'),
+                  items: _products
+                      .map((p) => DropdownMenuItem(
+                            value: p.id,
+                            child: Text(p.name),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedProductId = v),
+                ),
+                const SizedBox(height: 16),
+                Text('Date Range',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickFromDate,
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(_fromDate == null
+                            ? 'From'
+                            : formatShortDate(_fromDate!)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: Color(0xFFE0E0E0)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickToDate,
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(
+                            _toDate == null ? 'To' : formatShortDate(_toDate!)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: Color(0xFFE0E0E0)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _generateReport,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: _loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text('Generate Report'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_hasGenerated && !_loading) ...[
+            const SizedBox(height: 20),
+            AppCard(
+              child: Column(
+                children: [
+                  _metricRow(context, 'Total Revenue',
+                      formatCurrency(_totalRevenue), kPrimary),
+                  const Divider(),
+                  _metricRow(
+                      context,
+                      'Total Amount',
+                      '${_totalAmount.toStringAsFixed(2)} ${_products.firstWhere((p) => p.id == _selectedProductId, orElse: () => _products.first).type == 'weight' ? 'kg' : 'pcs'}',
+                      Colors.black87),
+                  const Divider(),
+                  _metricRow(context, 'Average Price',
+                      formatCurrency(_avgPrice), Colors.black87),
+                  const Divider(),
+                  _metricRow(
+                      context, 'Number of Sales', '$_numSales', Colors.black87),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Sales Breakdown',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            if (_sales.isEmpty)
+              AppCard(
+                child: Text(
+                  'No sales found for this product in the selected date range.',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                ),
+              )
+            else
+              ..._sales.map((sale) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(formatDate(sale.date),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                              Text(formatCurrency(sale.total),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: kPrimary,
+                                      )),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                  '${sale.amount.toStringAsFixed(2)} ${sale.productType == 'weight' ? 'kg' : 'pcs'} @ ${formatCurrency(sale.priceUsed)}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: Colors.grey[600])),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: sale.paymentMethod == 'mpesa'
+                                      ? Colors.green[50]
+                                      : Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  sale.paymentMethod.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: sale.paymentMethod == 'mpesa'
+                                        ? Colors.green[700]
+                                        : Colors.blue[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _metricRow(
+      BuildContext context, String label, String value, Color valueColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w500)),
+          Text(value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: valueColor,
+                  )),
+        ],
+      ),
+    );
+  }
+}
+
+class LoadingWidget extends StatelessWidget {
+  const LoadingWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: CircularProgressIndicator(color: kPrimary),
     );
   }
 }

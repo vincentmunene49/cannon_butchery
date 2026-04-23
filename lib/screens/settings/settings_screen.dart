@@ -7,7 +7,6 @@ import '../../models/product.dart';
 import '../../services/auth_service.dart';
 import '../../services/export_service.dart';
 import '../../services/firestore_service.dart';
-import '../../utils/error_handler.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
@@ -66,7 +65,8 @@ class _ProductsSection extends StatelessWidget {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Padding(
                 padding: EdgeInsets.all(20),
-                child: Center(child: CircularProgressIndicator(color: kPrimary)),
+                child:
+                    Center(child: CircularProgressIndicator(color: kPrimary)),
               );
             }
             if (snapshot.hasError) {
@@ -234,7 +234,8 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
         await FirestoreService.addProduct(product);
         final openingStock =
             double.tryParse(_currentStockCtrl.text.trim()) ?? 0;
-        await FirestoreService.saveNewProductOpeningStock(product, openingStock);
+        await FirestoreService.saveNewProductOpeningStock(
+            product, openingStock);
       }
 
       if (mounted) {
@@ -360,8 +361,10 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                   if (isEdit)
                     TextButton.icon(
                       onPressed: _delete,
-                      icon: const Icon(Icons.delete_outline, color: kRed, size: 18),
-                      label: const Text('Delete', style: TextStyle(color: kRed)),
+                      icon: const Icon(Icons.delete_outline,
+                          color: kRed, size: 18),
+                      label:
+                          const Text('Delete', style: TextStyle(color: kRed)),
                     ),
                 ],
               ),
@@ -444,7 +447,9 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                     helperText: 'Stock on hand right now — enter 0 if none',
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Required (enter 0 if none)';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Required (enter 0 if none)';
+                    }
                     if (double.tryParse(v) == null) return 'Enter a number';
                     return null;
                   },
@@ -458,8 +463,8 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                   value: _isActive,
                   onChanged: (v) => setState(() => _isActive = v),
                   title: const Text('Active'),
-                  subtitle:
-                      const Text('Inactive products are hidden from entry screens.'),
+                  subtitle: const Text(
+                      'Inactive products are hidden from entry screens.'),
                   activeThumbColor: kPrimary,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -513,14 +518,21 @@ class _Day1OpeningStockSectionState extends State<_Day1OpeningStockSection> {
 
   @override
   void dispose() {
-    for (final c in _controllers.values) c.dispose();
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _loadData() async {
     final hasEntries = await FirestoreService.hasAnyCompletedEntries();
     if (hasEntries) {
-      if (mounted) setState(() { _loading = false; _shouldShow = false; });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _shouldShow = false;
+        });
+      }
       return;
     }
 
@@ -609,8 +621,8 @@ class _Day1OpeningStockSectionState extends State<_Day1OpeningStockSection> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: TextFormField(
                         controller: _controllers[p.id],
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                               RegExp(r'^\d+\.?\d{0,3}')),
@@ -694,7 +706,8 @@ class _OpeningBalancesSectionState extends State<_OpeningBalancesSection> {
       // Also write directly into today's dailyEntry so opening balances are
       // immediately visible in Nightly Entry without waiting for carry-forward
       final todayId = dateToId(DateTime.now());
-      await FirestoreService.saveDay1OpeningBalancesToEntry(todayId, mpesa, cash);
+      await FirestoreService.saveDay1OpeningBalancesToEntry(
+          todayId, mpesa, cash);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Opening balances saved.')),
@@ -718,8 +731,7 @@ class _OpeningBalancesSectionState extends State<_OpeningBalancesSection> {
         const _SectionHeader(title: 'Opening Balances'),
         AppCard(
           child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: kPrimary))
+              ? const Center(child: CircularProgressIndicator(color: kPrimary))
               : Column(
                   children: [
                     Container(
@@ -730,8 +742,8 @@ class _OpeningBalancesSectionState extends State<_OpeningBalancesSection> {
                       ),
                       child: const Text(
                         '⚠️ Only change these if starting fresh. Changing mid-use will break calculations.',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF5D4037)),
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF5D4037)),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -801,7 +813,12 @@ class _EmployeeAccessSectionState extends State<_EmployeeAccessSection> {
 
   Future<void> _loadPin() async {
     final pin = await FirestoreService.getEmployeePin();
-    if (mounted) setState(() { _pin = pin; _loading = false; });
+    if (mounted) {
+      setState(() {
+        _pin = pin;
+        _loading = false;
+      });
+    }
   }
 
   String get _maskedPin => _pin?.replaceAll(RegExp(r'.'), '●') ?? '';
@@ -815,10 +832,14 @@ class _EmployeeAccessSectionState extends State<_EmployeeAccessSection> {
     setState(() => _saving = true);
     try {
       await FirestoreService.setEmployeePin(result);
-      setState(() { _pin = result; _saving = false; });
+      setState(() {
+        _pin = result;
+        _saving = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isChange ? 'PIN updated.' : 'Employee PIN set.')),
+          SnackBar(
+              content: Text(isChange ? 'PIN updated.' : 'Employee PIN set.')),
         );
       }
     } catch (e) {
@@ -853,7 +874,10 @@ class _EmployeeAccessSectionState extends State<_EmployeeAccessSection> {
     setState(() => _saving = true);
     try {
       await FirestoreService.clearEmployeePin();
-      setState(() { _pin = null; _saving = false; });
+      setState(() {
+        _pin = null;
+        _saving = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Employee access disabled.')),
@@ -1041,15 +1065,16 @@ class _DataManagementSection extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.download_outlined, color: kPrimary),
                 title: const Text('Export Data as CSV'),
-                subtitle: const Text('Exports products, entries, and stock additions'),
+                subtitle: const Text(
+                    'Exports products, entries, and stock additions'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () async {
                   try {
                     await ExportService.exportAll();
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Export failed: $e')));
                     }
                   }
                 },
@@ -1105,8 +1130,8 @@ class _DataManagementSection extends StatelessWidget {
             const SizedBox(height: 12),
             TextField(
               controller: textCtrl,
-              decoration:
-                  const InputDecoration(hintText: 'DELETE', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  hintText: 'DELETE', border: OutlineInputBorder()),
             ),
           ],
         ),
@@ -1126,7 +1151,8 @@ class _DataManagementSection extends StatelessWidget {
     if (doubleConfirmed != true) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Deletion cancelled — text did not match.')),
+          const SnackBar(
+              content: Text('Deletion cancelled — text did not match.')),
         );
       }
       return;
