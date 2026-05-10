@@ -49,19 +49,10 @@ class FirestoreService {
   static Future<void> updateProductPrice(
       String productId, double newPrice) async {
     final productRef = _products.doc(productId);
-    final snap = await productRef.get();
-    final oldPrice = (snap.data() as Map<String, dynamic>)['currentPrice'] ?? 0;
 
-    final batch = _db.batch();
-    batch.update(productRef, {'currentPrice': newPrice});
-    batch.set(
-      productRef.collection('priceHistory').doc(),
-      {
-        'price': oldPrice,
-        'effectiveFrom': Timestamp.fromDate(DateTime.now()),
-      },
-    );
-    await batch.commit();
+    // Just update the current price - don't add to history
+    // History is only for tracking past prices, not current changes
+    await productRef.update({'currentPrice': newPrice});
   }
 
   static Future<bool> productHasEntries(String productId) async {
