@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product.dart';
 import '../models/daily_entry.dart';
+import '../models/expense.dart';
 import '../models/product_entry.dart';
 import '../models/sale.dart';
 import '../models/stock_addition.dart';
@@ -16,6 +17,7 @@ class FirestoreService {
   static CollectionReference get _stockAdditions =>
       _db.collection('stockAdditions');
   static CollectionReference get _sales => _db.collection('sales');
+  static CollectionReference get _expenses => _db.collection('expenses');
 
   // ─── Products ──────────────────────────────────────────────────────────────
 
@@ -403,6 +405,60 @@ class FirestoreService {
         .orderBy('date', descending: true)
         .get();
     return snap.docs.map((d) => Sale.fromFirestore(d)).toList();
+  }
+
+  // ─── Expenses ──────────────────────────────────────────────────────────────
+
+  static Future<void> addExpense(Expense expense) async {
+    await _expenses.doc(expense.id).set(expense.toFirestore());
+  }
+
+  static Future<void> deleteExpense(String id) async {
+    await _expenses.doc(id).delete();
+  }
+
+  static Stream<List<Expense>> expensesStreamForDate(String dateId) {
+    final startOfDay = idToDate(dateId);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    return _expenses
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => Expense.fromFirestore(d)).toList());
+  }
+
+  static Future<List<Expense>> getExpensesForDate(String dateId) async {
+    final startOfDay = idToDate(dateId);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final snap = await _expenses
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+        .orderBy('date', descending: true)
+        .get();
+    return snap.docs.map((d) => Expense.fromFirestore(d)).toList();
+  }
+
+  static Stream<List<Expense>> allExpensesStream() {
+    return _expenses
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => Expense.fromFirestore(d)).toList());
+  }
+
+  static Future<List<Expense>> getAllExpenses() async {
+    final snap = await _expenses.orderBy('date', descending: true).get();
+    return snap.docs.map((d) => Expense.fromFirestore(d)).toList();
+  }
+
+  static Future<List<Expense>> getExpensesForRange(
+      DateTime from, DateTime to) async {
+    final snap = await _expenses
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
+        .where('date', isLessThan: Timestamp.fromDate(to))
+        .orderBy('date', descending: true)
+        .get();
+    return snap.docs.map((d) => Expense.fromFirestore(d)).toList();
   }
 
   // ─── Employee PIN ──────────────────────────────────────────────────────────

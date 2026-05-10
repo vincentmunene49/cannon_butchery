@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../app_theme.dart';
 import '../utils/error_handler.dart';
+import 'expenses/expenses_screen.dart';
 import 'home/home_screen.dart';
 import 'nightly_entry/nightly_entry_screen.dart';
 import 'stock/stock_screen.dart';
@@ -31,6 +32,7 @@ class MainShellState extends State<MainShell> {
       const HomeScreen(),
       const NightlyEntryScreen(),
       const StockScreen(),
+      const ExpensesScreen(),
       const ReportsScreen(),
       SettingsScreen(onEmployeeAccess: widget.onEmployeeAccess),
     ];
@@ -83,6 +85,11 @@ class MainShellState extends State<MainShell> {
             icon: Icon(Icons.shopping_bag_outlined),
             selectedIcon: Icon(Icons.shopping_bag_rounded),
             label: 'Purchase',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long_rounded),
+            label: 'Expenses',
           ),
           NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
