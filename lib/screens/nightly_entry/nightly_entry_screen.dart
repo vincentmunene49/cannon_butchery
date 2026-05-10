@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app_theme.dart';
 import '../../models/daily_entry.dart';
+import '../../models/expense.dart';
 import '../../models/product.dart';
 import '../../models/product_entry.dart';
 import '../../models/stock_addition.dart';
@@ -34,6 +35,7 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
 
   List<Product> _products = [];
   List<StockAddition> _todayAdditions = [];
+  List<Expense> _todayExpenses = [];
   Map<String, double> _openingStocks = {};
   Map<String, double> _openingBalances = {};
   Map<String, double> _stockAddedByProduct = {};
@@ -74,6 +76,7 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
       final activeProducts = products.where((p) => p.isActive).toList();
       final additions =
           await FirestoreService.getStockAdditionsForDate(_todayId);
+      final expenses = await FirestoreService.getExpensesForDate(_todayId);
       final openingStocks =
           await FirestoreService.getOpeningStockForDate(_today);
       final openingBalances =
@@ -151,6 +154,7 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
       setState(() {
         _products = activeProducts;
         _todayAdditions = additions;
+        _todayExpenses = expenses;
         _openingStocks = openingStocks;
         _openingBalances = openingBalances;
         _stockAddedByProduct = stockAddedMap;
@@ -244,10 +248,15 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
   double get _mpesaClosing => double.tryParse(_mpesaClosingCtrl.text) ?? 0;
   double get _cashClosing => double.tryParse(_cashClosingCtrl.text) ?? 0;
 
+  double get _mpesaExpenses =>
+      _todayExpenses.where((e) => e.paymentMethod == 'mpesa').fold(0.0, (s, e) => s + e.amount);
+  double get _cashExpenses =>
+      _todayExpenses.where((e) => e.paymentMethod == 'cash').fold(0.0, (s, e) => s + e.amount);
+
   double get _mpesaReceived =>
-      _mpesaClosing - _mpesaOpeningBalance + _mpesaStockExpenses;
+      _mpesaClosing - _mpesaOpeningBalance + _mpesaStockExpenses + _mpesaExpenses;
   double get _cashReceived =>
-      _cashClosing - _cashOpeningBalance + _cashStockExpenses;
+      _cashClosing - _cashOpeningBalance + _cashStockExpenses + _cashExpenses;
   double get _totalReceived => _mpesaReceived + _cashReceived;
 
   double get _totalExpectedMinimum =>
@@ -481,6 +490,8 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
             cashOpening: _cashOpeningBalance,
             mpesaStockExpenses: _mpesaStockExpenses,
             cashStockExpenses: _cashStockExpenses,
+            mpesaExpenses: _mpesaExpenses,
+            cashExpenses: _cashExpenses,
             mpesaReceived: _mpesaReceived,
             cashReceived: _cashReceived,
             totalReceived: _totalReceived,
@@ -702,6 +713,8 @@ class _MoneySection extends StatelessWidget {
   final double cashOpening;
   final double mpesaStockExpenses;
   final double cashStockExpenses;
+  final double mpesaExpenses;
+  final double cashExpenses;
   final double mpesaReceived;
   final double cashReceived;
   final double totalReceived;
@@ -714,6 +727,8 @@ class _MoneySection extends StatelessWidget {
     required this.cashOpening,
     required this.mpesaStockExpenses,
     required this.cashStockExpenses,
+    required this.mpesaExpenses,
+    required this.cashExpenses,
     required this.mpesaReceived,
     required this.cashReceived,
     required this.totalReceived,
@@ -802,14 +817,31 @@ class _MoneySection extends StatelessWidget {
               color: Colors.grey[50],
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              'Stock expenses (M-Pesa: ${formatCurrency(mpesaStockExpenses)}, '
-              'Cash: ${formatCurrency(cashStockExpenses)}) have been factored in '
-              'automatically from today\'s stock additions.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey[600]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Stock expenses (M-Pesa: ${formatCurrency(mpesaStockExpenses)}, '
+                  'Cash: ${formatCurrency(cashStockExpenses)}) have been factored in '
+                  'automatically from today\'s stock additions.',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.grey[600]),
+                ),
+                if (mpesaExpenses > 0 || cashExpenses > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Operating expenses (M-Pesa: ${formatCurrency(mpesaExpenses)}, '
+                    'Cash: ${formatCurrency(cashExpenses)}) have been deducted from '
+                    'closing balance.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.orange[800]),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../app_theme.dart';
 import '../../models/daily_entry.dart';
+import '../../models/expense.dart';
 import '../../models/product.dart';
 import '../../models/product_entry.dart';
 import '../../models/sale.dart';
@@ -442,7 +443,7 @@ class _RevenueTabState extends State<_RevenueTab> {
   int _range = 0; // 0=week, 1=month, 2=all
   bool _loading = true;
   List<DailyEntry> _entries = [];
-  List<ProductEntry> _productEntries = [];
+  Map<String, List<ProductEntry>> _productEntriesByDate = {};
 
   @override
   void initState() {
@@ -453,15 +454,14 @@ class _RevenueTabState extends State<_RevenueTab> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final entries = await FirestoreService.getAllEntries();
-    final allPEs = <ProductEntry>[];
+    final peByDate = <String, List<ProductEntry>>{};
     for (final e in entries) {
-      final pes = await FirestoreService.getProductEntriesForDate(e.id);
-      allPEs.addAll(pes);
+      peByDate[e.id] = await FirestoreService.getProductEntriesForDate(e.id);
     }
     if (!mounted) return;
     setState(() {
       _entries = entries;
-      _productEntries = allPEs;
+      _productEntriesByDate = peByDate;
       _loading = false;
     });
   }
@@ -480,16 +480,32 @@ class _RevenueTabState extends State<_RevenueTab> {
   }
 
   Map<String, double> _revenueByProduct() {
-    final filtered = _filteredEntries.map((e) => e.id).toSet();
     final result = <String, double>{};
-    for (final pe in _productEntries) {
-      // We need daily entry date — we stored it on entry id
-      // Use all if all time, else filter by entry date
-      if (_range == 2 || filtered.isNotEmpty) {
-        result[pe.productName] =
-            (result[pe.productName] ?? 0) + pe.minimumExpected;
+
+    // For each filtered daily entry, distribute actual revenue proportionally
+    for (final entry in _filteredEntries) {
+      final entryPEs = _productEntriesByDate[entry.id] ?? [];
+      if (entryPEs.isEmpty) continue;
+
+      // Get total expected for this day to calculate proportions
+      double totalExpected = 0;
+      final productExpected = <String, double>{};
+      for (final pe in entryPEs) {
+        totalExpected += pe.minimumExpected;
+        productExpected[pe.productName] =
+            (productExpected[pe.productName] ?? 0) + pe.minimumExpected;
+      }
+
+      // Distribute actual revenue proportionally based on expected values
+      if (totalExpected > 0) {
+        for (final productName in productExpected.keys) {
+          final proportion = productExpected[productName]! / totalExpected;
+          final actualRevenue = entry.totalReceived * proportion;
+          result[productName] = (result[productName] ?? 0) + actualRevenue;
+        }
       }
     }
+
     return result;
   }
 
@@ -721,7 +737,7 @@ class _ProfitTabState extends State<_ProfitTab> {
   bool _loading = true;
   List<DailyEntry> _entries = [];
   List<StockAddition> _stockAdditions = [];
-  List<ProductEntry> _productEntries = [];
+  List<Expense> _expenses = [];
 
   @override
   void initState() {
@@ -733,16 +749,12 @@ class _ProfitTabState extends State<_ProfitTab> {
     setState(() => _loading = true);
     final entries = await FirestoreService.getAllEntries();
     final stock = await FirestoreService.getAllStockAdditions();
-    final allPEs = <ProductEntry>[];
-    for (final e in entries) {
-      final pes = await FirestoreService.getProductEntriesForDate(e.id);
-      allPEs.addAll(pes);
-    }
+    final expenses = await FirestoreService.getAllExpenses();
     if (!mounted) return;
     setState(() {
       _entries = entries;
       _stockAdditions = stock;
-      _productEntries = allPEs;
+      _expenses = expenses;
       _loading = false;
     });
   }
@@ -773,22 +785,25 @@ class _ProfitTabState extends State<_ProfitTab> {
     }).toList();
   }
 
+  List<Expense> get _filteredExpenses {
+    final now = DateTime.now();
+    return _expenses.where((e) {
+      if (_range == 0) {
+        return e.date.isAfter(now.subtract(const Duration(days: 7)));
+      }
+      if (_range == 1) {
+        return e.date.isAfter(now.subtract(const Duration(days: 30)));
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingWidget();
 
-    final filteredIds = _filteredEntries.map((e) => e.id).toSet();
-
-    // Revenue per product (from productEntries in range)
-    final revenueByProduct = <String, double>{};
-    for (final pe in _productEntries) {
-      if (filteredIds.contains(
-          dateToId(pe.openingStock > 0 ? DateTime.now() : DateTime.now()))) {
-        // Include all product entries for simplicity (date tracking would need productEntry date)
-        revenueByProduct[pe.productName] =
-            (revenueByProduct[pe.productName] ?? 0) + pe.minimumExpected;
-      }
-    }
+    // Calculate total revenue from filtered entries (actual money received)
+    final totalRevenue = _filteredEntries.fold<double>(0, (s, e) => s + e.totalReceived);
 
     // Cost per product
     final costByProduct = <String, double>{};
@@ -797,16 +812,11 @@ class _ProfitTabState extends State<_ProfitTab> {
           (costByProduct[s.productName] ?? 0) + s.costPaid;
     }
 
-    final allProducts = {
-      ...revenueByProduct.keys,
-      ...costByProduct.keys,
-    }.toList()
-      ..sort();
-
-    final totalRevenue =
-        revenueByProduct.values.fold<double>(0, (s, v) => s + v);
     final totalCost = costByProduct.values.fold<double>(0, (s, v) => s + v);
-    final totalProfit = totalRevenue - totalCost;
+    final totalOperatingExpenses =
+        _filteredExpenses.fold<double>(0, (s, e) => s + e.amount);
+    final grossProfit = totalRevenue - totalCost;
+    final netProfit = grossProfit - totalOperatingExpenses;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -826,7 +836,7 @@ class _ProfitTabState extends State<_ProfitTab> {
             ),
           ),
           const SizedBox(height: 16),
-          if (allProducts.isEmpty)
+          if (_filteredEntries.isEmpty)
             const EmptyState(
               icon: Icons.pie_chart_outline,
               title: 'No data for this period',
@@ -835,25 +845,94 @@ class _ProfitTabState extends State<_ProfitTab> {
             AppCard(
               child: Column(
                 children: [
-                  _headerRow(context),
+                  _summaryRow(context, 'Revenue', totalRevenue, kPrimary),
                   const Divider(),
-                  ...allProducts.map((name) {
-                    final rev = revenueByProduct[name] ?? 0;
-                    final cost = costByProduct[name] ?? 0;
-                    final profit = rev - cost;
-                    final margin = rev > 0 ? (profit / rev * 100) : 0;
-                    return _productRow(
-                        context, name, rev, cost, profit, margin);
-                  }),
+                  _summaryRow(context, 'Cost of Goods', totalCost, Colors.grey[700]!),
                   const Divider(thickness: 2),
-                  _productRow(
-                    context,
-                    'TOTAL',
-                    totalRevenue,
-                    totalCost,
-                    totalProfit,
-                    totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0,
-                    bold: true,
+                  _summaryRow(context, 'Gross Profit', grossProfit, grossProfit >= 0 ? kGreen : kRed, bold: true),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (costByProduct.isNotEmpty) ...[
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Cost Breakdown',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 12),
+                    ...costByProduct.entries.map((e) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(e.key,
+                                  style: Theme.of(context).textTheme.bodySmall),
+                              Text(formatCurrency(e.value),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            AppCard(
+              color: const Color(0xFFFFF8E1),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Gross Profit',
+                          style: Theme.of(context).textTheme.bodyMedium),
+                      Text(formatCurrency(grossProfit),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Operating Expenses',
+                          style: Theme.of(context).textTheme.bodyMedium),
+                      Text(formatCurrency(totalOperatingExpenses),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange[900])),
+                    ],
+                  ),
+                  const Divider(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Net Profit',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(formatCurrency(netProfit),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: netProfit >= 0 ? kGreen : kRed)),
+                    ],
                   ),
                 ],
               ),
@@ -864,82 +943,22 @@ class _ProfitTabState extends State<_ProfitTab> {
     );
   }
 
-  Widget _headerRow(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-              flex: 2,
-              child: Text('Product',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
-          Expanded(
-              child: Text('Revenue',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
-          Expanded(
-              child: Text('Cost',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
-          Expanded(
-              child: Text('Profit',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
-          Expanded(
-              child: Text('Margin',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700, color: Colors.grey[600]))),
-        ],
-      ),
-    );
-  }
-
-  Widget _productRow(BuildContext context, String name, double rev, double cost,
-      double profit, num margin,
+  Widget _summaryRow(BuildContext context, String label, double value, Color color,
       {bool bold = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-              flex: 2,
-              child: Text(name,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
-                      ))),
-          Expanded(
-              child: Text('K${(rev / 1000).toStringAsFixed(1)}',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: bold ? FontWeight.w700 : null))),
-          Expanded(
-              child: Text('K${(cost / 1000).toStringAsFixed(1)}',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: bold ? FontWeight.w700 : null))),
-          Expanded(
-              child: Text('K${(profit / 1000).toStringAsFixed(1)}',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: profit >= 0 ? kGreen : kRed,
-                        fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
-                      ))),
-          Expanded(
-              child: Text('${margin.toStringAsFixed(1)}%',
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: profit >= 0 ? kGreen : kRed,
-                        fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
-                      ))),
+          Text(label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                  )),
+          Text(formatCurrency(value),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  )),
         ],
       ),
     );
