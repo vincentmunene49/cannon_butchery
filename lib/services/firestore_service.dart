@@ -74,28 +74,16 @@ class FirestoreService {
     await _products.doc(productId).delete();
   }
 
-  // Get price for a product on a given date (from priceHistory)
+  // Get price for a product (always returns current price)
   static Future<double> getPriceForDate(String productId, DateTime date) async {
     final productSnap = await _products.doc(productId).get();
     if (!productSnap.exists) return 0;
 
+    // Always return current price (ignore price history)
     final currentPrice =
         ((productSnap.data() as Map<String, dynamic>)['currentPrice'] ?? 0)
             .toDouble();
 
-    // Check price history for any price that was effective on or before the given date
-    final historySnap = await _products
-        .doc(productId)
-        .collection('priceHistory')
-        .where('effectiveFrom', isLessThanOrEqualTo: Timestamp.fromDate(date))
-        .orderBy('effectiveFrom', descending: true)
-        .limit(1)
-        .get();
-
-    if (historySnap.docs.isNotEmpty) {
-      return ((historySnap.docs.first.data())['price'] ?? currentPrice)
-          .toDouble();
-    }
     return currentPrice;
   }
 
