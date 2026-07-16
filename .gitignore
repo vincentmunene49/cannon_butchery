@@ -31,7 +31,18 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+**/build/
 /coverage/
+
+# Flutter web build output
+/web/.last_build_id
+/web/assets/
+/web/canvaskit/
+/web/flutter.js
+/web/flutter_bootstrap.js
+/web/flutter_service_worker.js
+/web/main.dart.js
+/web/version.json
 
 # Symbolication related
 app.*.symbols
