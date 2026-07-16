@@ -30,9 +30,6 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
   bool _saving = false;
   bool _hasExistingEntry = false;
 
-  // True when there is no completed yesterday entry → first time recording wastage
-  bool _isDay1Wastage = true;
-
   List<Product> _products = [];
   List<StockAddition> _todayAdditions = [];
   List<Expense> _todayExpenses = [];
@@ -40,10 +37,6 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
   Map<String, double> _openingBalances = {};
   Map<String, double> _stockAddedByProduct = {};
   Map<String, double> _priceByProduct = {};
-  // Yesterday's wastage bag weights per product (empty on Day 1)
-  Map<String, double> _yesterdayBagWeights = {};
-  // New batch detection per product (yesterday = 0, today has additions)
-  Map<String, bool> _isNewBatchByProduct = {};
 
   final Map<String, TextEditingController> _remainingControllers = {};
   final Map<String, TextEditingController> _bagWeightControllers = {};
@@ -83,37 +76,11 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
           await FirestoreService.getOpeningBalancesForDate(_today);
       final existingEntry = await FirestoreService.getEntryForDate(_todayId);
 
-      // Determine whether yesterday had a completed entry
-      final yesterdayId = dateToId(_today.subtract(const Duration(days: 1)));
-      final yesterdayEntry =
-          await FirestoreService.getEntryForDate(yesterdayId);
-      final isDay1 = yesterdayEntry == null || !yesterdayEntry.isCompleted;
-
-      // Yesterday's bag weights (needed for actualWastage calculation)
-      final yesterdayBags = isDay1
-          ? <String, double>{}
-          : await FirestoreService.getYesterdayWastageBagWeights(_today);
-
-      // Get yesterday's remaining stock to detect new batches
-      final yesterdayProductEntries = isDay1
-          ? <String, double>{}
-          : await FirestoreService.getProductEntriesForDate(yesterdayId).then(
-              (entries) =>
-                  {for (final e in entries) e.productId: e.remainingStock});
-
       // Stock added per product
       final stockAddedMap = <String, double>{};
       for (final a in additions) {
         stockAddedMap[a.productId] =
             (stockAddedMap[a.productId] ?? 0) + a.sellableAmount;
-      }
-
-      // Detect new batch per product: yesterday = 0 AND today has stock additions
-      final isNewBatch = <String, bool>{};
-      for (final p in activeProducts) {
-        final yesterdayRemaining = yesterdayProductEntries[p.id] ?? 0;
-        final todayAdded = stockAddedMap[p.id] ?? 0;
-        isNewBatch[p.id] = yesterdayRemaining == 0 && todayAdded > 0;
       }
 
       // Price per product
@@ -159,9 +126,6 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
         _openingBalances = openingBalances;
         _stockAddedByProduct = stockAddedMap;
         _priceByProduct = priceMap;
-        _yesterdayBagWeights = yesterdayBags;
-        _isNewBatchByProduct = isNewBatch;
-        _isDay1Wastage = isDay1;
         _remainingControllers.addAll(remainingMap);
         _bagWeightControllers.addAll(bagMap);
         _hasExistingEntry = isRealEntry;
@@ -193,6 +157,8 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
     return sold < 0 ? 0 : sold;
   }
 
+  // Today's wastage entered tonight. This value stands alone each day —
+  // it starts at 0 and is NOT accumulated from previous days.
   double? _wastageBagFor(Product p) {
     if (!p.isWeightBased) return null;
     final text = _bagWeightControllers[p.id]?.text ?? '';
@@ -200,28 +166,20 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
     return double.tryParse(text);
   }
 
+  // Actual wastage for the day is simply what was entered tonight (per-day,
+  // no delta against yesterday's bag).
   double? _actualWastageFor(Product p) {
     if (!p.isWeightBased) return null;
     final tonight = _wastageBagFor(p);
     if (tonight == null) return null;
-    if (_isDay1Wastage) return null; // Day 1: just recording, no delta yet
-
-    // New batch detection: yesterday = 0 kg AND today has stock additions
-    if (_isNewBatchByProduct[p.id] == true) {
-      return null; // Baseline for new batch
-    }
-
-    final yesterday = _yesterdayBagWeights[p.id];
-    if (yesterday == null) return null;
-    final delta = tonight - yesterday;
-    return delta < 0 ? 0 : delta;
+    return tonight < 0 ? 0 : tonight;
   }
 
   double _accountableSoldFor(Product p) {
     final estimated = _estimatedSoldFor(p);
     if (!p.isWeightBased) return estimated;
     final actualWastage = _actualWastageFor(p);
-    if (actualWastage == null) return estimated; // no bag entered
+    if (actualWastage == null) return estimated; // no wastage entered
     final accountable = estimated - actualWastage - _kWastageBuffer;
     return accountable < 0 ? 0 : accountable;
   }
@@ -473,9 +431,6 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
                 added: _addedFor(p),
                 remainingController: _remainingControllers[p.id]!,
                 bagWeightController: _bagWeightControllers[p.id],
-                isDay1Wastage: _isDay1Wastage,
-                isNewBatch: _isNewBatchByProduct[p.id] ?? false,
-                yesterdayBagWeight: _yesterdayBagWeights[p.id],
                 onChanged: () => setState(() {}),
               )),
 
@@ -511,9 +466,6 @@ class _NightlyEntryScreenState extends State<NightlyEntryScreen> {
                 actualWastage: _actualWastageFor(p),
                 minimumExpected: _minimumExpectedFor(p),
                 price: _priceByProduct[p.id] ?? p.currentPrice,
-                isDay1Wastage: _isDay1Wastage,
-                isNewBatch: _isNewBatchByProduct[p.id] ?? false,
-                hasWastageBag: _wastageBagFor(p) != null,
               )),
 
           const SizedBox(height: 16),
@@ -559,9 +511,6 @@ class _StockEntryCard extends StatelessWidget {
   final double added;
   final TextEditingController remainingController;
   final TextEditingController? bagWeightController;
-  final bool isDay1Wastage;
-  final bool isNewBatch;
-  final double? yesterdayBagWeight;
   final VoidCallback onChanged;
 
   const _StockEntryCard({
@@ -570,9 +519,6 @@ class _StockEntryCard extends StatelessWidget {
     required this.added,
     required this.remainingController,
     required this.bagWeightController,
-    required this.isDay1Wastage,
-    required this.isNewBatch,
-    required this.yesterdayBagWeight,
     required this.onChanged,
   });
 
@@ -640,17 +586,11 @@ class _StockEntryCard extends StatelessWidget {
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
                 ],
                 onChanged: (_) => onChanged(),
-                decoration: InputDecoration(
-                  labelText: 'Wastage bag weight tonight',
+                decoration: const InputDecoration(
+                  labelText: "Wastage today",
                   suffixText: 'kg',
                   hintText: '0',
-                  helperText: isDay1Wastage
-                      ? 'Day 1 — recording for reference, tracking starts tomorrow'
-                      : isNewBatch
-                          ? 'New batch detected — baseline recorded, tracking starts tomorrow'
-                          : yesterdayBagWeight != null
-                              ? 'Last night: ${yesterdayBagWeight!.toStringAsFixed(2)} kg'
-                              : 'No last night data',
+                  helperText: "Today's waste only — starts fresh each day",
                 ),
               ),
             ],
@@ -861,9 +801,6 @@ class _ReviewCard extends StatelessWidget {
   final double? actualWastage;
   final double minimumExpected;
   final double price;
-  final bool isDay1Wastage;
-  final bool isNewBatch;
-  final bool hasWastageBag;
 
   const _ReviewCard({
     required this.product,
@@ -874,9 +811,6 @@ class _ReviewCard extends StatelessWidget {
     required this.actualWastage,
     required this.minimumExpected,
     required this.price,
-    required this.isDay1Wastage,
-    required this.isNewBatch,
-    required this.hasWastageBag,
   });
 
   @override
@@ -904,65 +838,13 @@ class _ReviewCard extends StatelessWidget {
             const SizedBox(height: 10),
             _row(context, 'Available → Remaining → Sold',
                 '${formatWeight(available, product.type)} → ${formatWeight(remaining, product.type)} → ${formatWeight(estimated, product.type)}'),
-            if (product.isWeightBased) ...[
-              if (isDay1Wastage && hasWastageBag)
-                // Day 1: just recorded, no calculation yet
-                Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 4),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline,
-                            size: 14, color: Colors.blue[700]),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Wastage tracking starts tomorrow',
-                          style:
-                              TextStyle(fontSize: 11, color: Colors.blue[700]),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else if (isNewBatch && hasWastageBag)
-                // New batch: baseline recorded
-                Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 4),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.refresh_rounded,
-                            size: 14, color: Colors.green[700]),
-                        const SizedBox(width: 6),
-                        Text(
-                          'New batch — baseline recorded',
-                          style:
-                              TextStyle(fontSize: 11, color: Colors.green[700]),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else if (!isDay1Wastage && actualWastage != null) ...[
-                _row(context, 'Actual wastage',
-                    formatWeight(actualWastage!, product.type)),
-                _row(context, 'Buffer',
-                    formatWeight(_kWastageBuffer, product.type)),
-                _row(context, 'Accountable sold',
-                    formatWeight(accountable, product.type)),
-              ],
+            if (product.isWeightBased && actualWastage != null) ...[
+              _row(context, 'Wastage today',
+                  formatWeight(actualWastage!, product.type)),
+              _row(context, 'Buffer',
+                  formatWeight(_kWastageBuffer, product.type)),
+              _row(context, 'Accountable sold',
+                  formatWeight(accountable, product.type)),
             ],
             _row(context, 'Price used',
                 '${formatCurrency(price)} / ${product.isWeightBased ? 'kg' : 'unit'}'),

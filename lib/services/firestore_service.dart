@@ -294,20 +294,6 @@ class FirestoreService {
     await batch.commit();
   }
 
-  // Returns wastage bag weights from yesterday's productEntries keyed by productId.
-  static Future<Map<String, double>> getYesterdayWastageBagWeights(
-      DateTime date) async {
-    final yesterdayId = dateToId(date.subtract(const Duration(days: 1)));
-    final entries = await getProductEntriesForDate(yesterdayId);
-    final result = <String, double>{};
-    for (final pe in entries) {
-      if (pe.wastageBagWeight != null) {
-        result[pe.productId] = pe.wastageBagWeight!;
-      }
-    }
-    return result;
-  }
-
   // Writes opening balances into today's dailyEntry with isCompleted: false so
   // NightlyEntry does not treat this as a completed entry.
   static Future<void> saveDay1OpeningBalancesToEntry(

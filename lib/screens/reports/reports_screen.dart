@@ -82,8 +82,6 @@ class _DailyTabState extends State<_DailyTab> {
   bool _loading = false;
   DailyEntry? _entry;
   List<ProductEntry> _productEntries = [];
-  // Bag weights from the day before _selectedDate, keyed by productId
-  Map<String, double> _prevDayBagWeights = {};
 
   @override
   void initState() {
@@ -98,13 +96,10 @@ class _DailyTabState extends State<_DailyTab> {
     final pes = entry != null
         ? await FirestoreService.getProductEntriesForDate(dateId)
         : <ProductEntry>[];
-    final prevBags =
-        await FirestoreService.getYesterdayWastageBagWeights(_selectedDate);
     if (!mounted) return;
     setState(() {
       _entry = entry;
       _productEntries = pes;
-      _prevDayBagWeights = prevBags;
       _loading = false;
     });
   }
@@ -222,9 +217,6 @@ class _DailyTabState extends State<_DailyTab> {
 
                   // Per product
                   ..._productEntries.map((pe) {
-                    final prevBag = _prevDayBagWeights[pe.productId];
-                    final isDay1Wastage =
-                        pe.wastageBagWeight != null && pe.actualWastage == null;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: AppCard(
@@ -259,26 +251,9 @@ class _DailyTabState extends State<_DailyTab> {
                             // Wastage section — weight-based products only
                             if (pe.isWeightBased) ...[
                               const Divider(height: 16),
-                              if (pe.wastageBagWeight != null)
-                                _kv('Wastage bag tonight',
-                                    '${pe.wastageBagWeight!.toStringAsFixed(2)} kg'),
-                              if (!isDay1Wastage && prevBag != null)
-                                _kv('Wastage bag last night',
-                                    '${prevBag.toStringAsFixed(2)} kg'),
-                              if (isDay1Wastage) ...[
-                                _kvCustom(
-                                  context,
-                                  'Actual wastage',
-                                  'Tracking starts tomorrow',
-                                  valueColor: Colors.blue[700],
-                                ),
+                              if (pe.actualWastage != null) ...[
                                 _kv(
-                                    'Accountable sold',
-                                    formatWeight(
-                                        pe.estimatedSold, pe.productType)),
-                              ] else if (pe.actualWastage != null) ...[
-                                _kv(
-                                    'Actual wastage',
+                                    'Wastage today',
                                     formatWeight(
                                         pe.actualWastage!, pe.productType)),
                                 _kv(
@@ -342,27 +317,6 @@ class _DailyTabState extends State<_DailyTab> {
     );
   }
 
-  Widget _kvCustom(BuildContext context, String k, String v,
-      {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(k,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey[600])),
-          Text(v,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontWeight: FontWeight.w600, color: valueColor)),
-        ],
-      ),
-    );
-  }
 }
 
 class _VerdictBanner extends StatelessWidget {
@@ -1511,7 +1465,7 @@ class _TrendsTabState extends State<_TrendsTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Wastage Bag Weight Per Product — Last 30 Days'),
+        _sectionTitle('Wastage Per Product — Last 30 Days'),
         _legendChips(
             products,
             _shownWastage,
@@ -1524,7 +1478,7 @@ class _TrendsTabState extends State<_TrendsTab> {
               : SizedBox(
                   height: 200,
                   child: LineChart(_multiLineData(data, products, _shownWastage,
-                      (pe) => pe.wastageBagWeight,
+                      (pe) => pe.actualWastage,
                       yLabel: (v) => '${v.toStringAsFixed(1)}kg',
                       fillArea: true)),
                 ),
